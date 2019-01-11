@@ -5,8 +5,11 @@ import (
 	"math/rand"
 	"sync"
 
+	"encoding/json"
+	"github.com/alecthomas/log4go"
 	consulApi "github.com/hashicorp/consul/api"
 	consulWatch "github.com/hashicorp/consul/watch"
+	"reflect"
 )
 
 var (
@@ -33,12 +36,30 @@ func (v *WatchedParam) Set(value string) {
 	v.value = value
 }
 
-func GetSingle(key string) string {
-	pair, _, err := KV.Get(fmt.Sprintf("%s/%s", Prefix, key), nil)
+func getSingle(key string) (value string) {
+	key = fmt.Sprintf("%s/%s", Prefix, key)
+	pair, _, err := KV.Get(key, nil)
 	if err != nil {
+		err = fmt.Errorf("key:%s, err:%+v", key, err)
+		log4go.Error("%+v", err)
 		panic(err)
 	}
-	return string(pair.Value)
+	if pair == nil {
+		err = fmt.Errorf("consul has't key: %s", key)
+		log4go.Error("%+v", err)
+		panic(err)
+	}
+	value = string(pair.Value)
+	return
+}
+
+func GetSingle(key string, i interface{}) {
+	value := getSingle(key)
+	if err := json.Unmarshal([]byte(value), i); err != nil {
+		log4go.Error("consul:%s err:%+i", key, err)
+		panic(err)
+	}
+	log4go.Info("consul:%s:%+v", key, reflect.ValueOf(i).Elem())
 }
 
 func WatchSingle(key string, param *WatchedParam) {

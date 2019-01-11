@@ -6,12 +6,14 @@ import (
 	log "github.com/alecthomas/log4go"
 	"github.com/aws/aws-xray-sdk-go/header"
 
+	"context"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	xlog "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -172,4 +174,26 @@ func Metrics(notLogged ...string) gin.HandlerFunc {
 func GetMetrics(c *gin.Context) {
 	handler := promhttp.Handler()
 	handler.ServeHTTP(c.Writer, c.Request)
+}
+
+const unknown = "unknown"
+
+func GetSource(skip int) (name string) {
+	name = unknown
+	if pc, _, line, ok := runtime.Caller(skip); ok {
+		name = fmt.Sprintf("%s:%d", runtime.FuncForPC(pc).Name(), line)
+	}
+	return
+}
+
+//凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
+func BeginSubsegment(ctxp *context.Context) (seg *xray.Segment) {
+	name := GetSource(2)
+	*ctxp, seg = xray.BeginSubsegment(*ctxp, name)
+	return
+}
+func BeginSegment(ctxp *context.Context) (seg *xray.Segment) {
+	name := GetSource(2)
+	*ctxp, seg = xray.BeginSegment(*ctxp, name)
+	return
 }
