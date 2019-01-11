@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"net/http/httputil"
 	"runtime"
 
-	log "github.com/alecthomas/log4go"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"net/http"
+	"net/http/httputil"
 )
 
 var (
@@ -26,8 +26,11 @@ func Recovery() gin.HandlerFunc {
 				endPoint := c.Request.URL.Path
 				stack := stack(3)
 				httpRequest, _ := httputil.DumpRequest(c.Request, true)
-				log.Error(err)
-				log.Error("%s\n%s", string(httpRequest), string(stack))
+				logrus.WithField("error", err).Error()
+				logrus.WithFields(logrus.Fields{
+					"httpRequest": string(httpRequest),
+					"stack":       string(stack),
+				})
 
 				ErrorCounter.WithLabelValues(c.Request.Method, endPoint).Inc()
 				c.AbortWithStatus(http.StatusInternalServerError)

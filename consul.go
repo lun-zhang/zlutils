@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"encoding/json"
-	"github.com/alecthomas/log4go"
 	consulApi "github.com/hashicorp/consul/api"
 	consulWatch "github.com/hashicorp/consul/watch"
+	"github.com/sirupsen/logrus"
 	"reflect"
 )
 
@@ -40,14 +40,11 @@ func getSingle(key string) (value string) {
 	key = fmt.Sprintf("%s/%s", Prefix, key)
 	pair, _, err := KV.Get(key, nil)
 	if err != nil {
-		err = fmt.Errorf("key:%s, err:%+v", key, err)
-		log4go.Error("%+v", err)
-		panic(err)
+		logrus.WithError(err).WithField("key", key).Fatal()
 	}
 	if pair == nil {
-		err = fmt.Errorf("consul has't key: %s", key)
-		log4go.Error("%+v", err)
-		panic(err)
+		err = fmt.Errorf("consul has't key")
+		logrus.WithError(err).WithField("key", key).Fatal()
 	}
 	value = string(pair.Value)
 	return
@@ -56,10 +53,15 @@ func getSingle(key string) (value string) {
 func GetSingle(key string, i interface{}) {
 	value := getSingle(key)
 	if err := json.Unmarshal([]byte(value), i); err != nil {
-		log4go.Error("consul:%s err:%+i", key, err)
-		panic(err)
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"key":   key,
+			"value": value,
+		}).Fatal("consul key invalid")
 	}
-	log4go.Info("consul:%s:%+v", key, reflect.ValueOf(i).Elem())
+	logrus.WithFields(logrus.Fields{
+		"key":   key,
+		"value": fmt.Sprintf("%+v", reflect.ValueOf(i).Elem()),
+	}).Info()
 }
 
 func WatchSingle(key string, param *WatchedParam) {
@@ -106,11 +108,11 @@ func InitConsul(address string, prefix string) {
 	conConfig := consulApi.Config{Address: address}
 	consulClient, err := consulApi.NewClient(&conConfig)
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal()
 	}
 
 	KV = consulClient.KV()
 	Catalog = consulClient.Catalog()
 
-	fmt.Println("consulClient:", consulClient)
+	logrus.WithField("consulClient", fmt.Sprintf("%v", consulClient)).Info()
 }

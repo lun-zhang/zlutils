@@ -2,16 +2,15 @@ package zlutils
 
 import (
 	"bytes"
-	"fmt"
-	log "github.com/alecthomas/log4go"
-	"github.com/aws/aws-xray-sdk-go/header"
-
 	"context"
+	"fmt"
+	"github.com/aws/aws-xray-sdk-go/header"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	xlog "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -150,14 +149,14 @@ func Metrics(notLogged ...string) gin.HandlerFunc {
 			end := time.Now()
 			latency := end.Sub(start)
 
-			log.Info("%3d | %13v | %-15s | %-7s %s %s",
-				statusCode,
-				latency,
-				clientIP,
-				method,
-				path,
-				comment,
-			)
+			logrus.WithFields(logrus.Fields{
+				"statusCode": statusCode,
+				"latency":    fmt.Sprintf("%v", latency),
+				"clientIP":   clientIP,
+				"method":     method,
+				"path":       path,
+				"comment":    comment,
+			}).Info()
 
 			if statusCode != http.StatusNotFound {
 				elapsed := latency.Seconds() * 1000.0
@@ -177,6 +176,20 @@ func GetMetrics(c *gin.Context) {
 }
 
 const unknown = "unknown"
+
+func GetStack(skip int) (names []string) {
+	for i := skip; ; i++ {
+		s := GetSource(i)
+		if s == unknown {
+			break
+		}
+		if len(s) < len(ProjectName) || s[:len(ProjectName)] != ProjectName {
+			continue
+		}
+		names = append(names, s)
+	}
+	return
+}
 
 func GetSource(skip int) (name string) {
 	name = unknown
