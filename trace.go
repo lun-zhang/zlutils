@@ -26,6 +26,8 @@ var (
 	ResponseCounter *prometheus.CounterVec
 	ErrorCounter    *prometheus.CounterVec
 	ResponseLatency *prometheus.HistogramVec
+	MysqlCounter    *prometheus.CounterVec   //mysql查询次数
+	MysqlLatency    *prometheus.HistogramVec //mysql耗时
 
 	sn *xray.FixedSegmentNamer
 )
@@ -53,12 +55,31 @@ func InitTrace() {
 		},
 		[]string{"method", "endpoint"},
 	)
+	MysqlCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_mysql_total", ProjectName),
+			Help: "Total Mysql counts",
+		},
+		[]string{"method"}, //method=SELECT INSERT DELETE UPDATE
+	)
+	MysqlLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    fmt.Sprintf("%s_mysql_latency_millisecond", ProjectName),
+			Help:    "Mysql latency (millisecond)",
+			Buckets: historyBuckets[:],
+		},
+		[]string{"method"}, //method=SELECT INSERT DELETE UPDATE
+	)
 
 	sn = xray.NewFixedSegmentNamer(ProjectName)
 
-	prometheus.MustRegister(ResponseCounter)
-	prometheus.MustRegister(ErrorCounter)
-	prometheus.MustRegister(ResponseLatency)
+	prometheus.MustRegister(
+		ResponseCounter,
+		ErrorCounter,
+		ResponseLatency,
+		MysqlCounter,
+		MysqlLatency,
+	)
 
 	xray.Configure(xray.Config{
 		DaemonAddr:     "127.0.0.1:3000",
@@ -200,13 +221,14 @@ func GetSource(skip int) (name string) {
 }
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
-func BeginSubsegment(ctxp *context.Context) (seg *xray.Segment) {
-	name := GetSource(2)
-	*ctxp, seg = xray.BeginSubsegment(*ctxp, name)
-	return
+//没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
+func BeginSubsegment(ctxp *context.Context) func() {
+	var seg *xray.Segment
+	*ctxp, seg = xray.BeginSubsegment(*ctxp, GetSource(2))
+	return func() { seg.Close(nil) }
 }
-func BeginSegment(ctxp *context.Context) (seg *xray.Segment) {
-	name := GetSource(2)
-	*ctxp, seg = xray.BeginSegment(*ctxp, name)
-	return
+func BeginSegment(ctxp *context.Context) func() {
+	var seg *xray.Segment
+	*ctxp, seg = xray.BeginSegment(*ctxp, GetSource(2))
+	return func() { seg.Close(nil) }
 }
