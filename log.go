@@ -5,6 +5,7 @@ import (
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
+	"os"
 	"time"
 )
 
@@ -27,7 +28,11 @@ func (f MyFormatter) Format(e *logrus.Entry) ([]byte, error) {
 }
 
 func getLogWriter(level string) *rotatelogs.RotateLogs {
-	path := fmt.Sprintf("/data/logs/%s/%s.log", ProjectName, level)
+	dir := fmt.Sprintf("/data/logs/%s", ProjectName)
+	path := fmt.Sprintf("%s/%s.log", dir, level)
+	if _, err := os.Stat(dir); err != nil || os.IsNotExist(err) {
+		panic(fmt.Errorf("not exist dir %s", dir))
+	}
 	writer, err := rotatelogs.New(
 		path+".%Y%m%d",
 		rotatelogs.WithLinkName(path),

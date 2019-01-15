@@ -35,17 +35,18 @@ func HttpPost(ctx context.Context, client *http.Client, url string, reqBody inte
 		entry.WithError(err).Error()
 		return
 	}
-	entry.WithField("body", string(body)).Debug()
+	entry = entry.WithField("body", string(body))
+	entry.Debug()
 
 	if resp.StatusCode == http.StatusOK {
 		if err = json.Unmarshal(body, respBody); err != nil {
-			entry.WithError(err).WithField("body", string(body)).Error()
+			entry.WithError(err).Error()
 			return
 		}
 		return nil
 	} else {
-		err = fmt.Errorf("status code is't 200")
-		entry.WithError(err).WithField("body", string(body)).Error()
+		err = fmt.Errorf("StatusCode %d != 200", resp.StatusCode)
+		entry.WithError(err).Error()
 		return
 	}
 }
@@ -66,17 +67,18 @@ func HttpGet(ctx context.Context, client *http.Client, url string, respBody inte
 		entry.WithError(err).Error()
 		return
 	}
-	entry.WithField("body", string(body)).Debug()
+	entry = entry.WithField("body", string(body))
+	entry.Debug()
 
 	if resp.StatusCode == http.StatusOK {
 		if err = json.Unmarshal(body, respBody); err != nil {
-			entry.WithError(err).WithField("body", string(body)).Error()
+			entry.WithError(err).Error()
 			return
 		}
-		return
+		return nil
 	} else {
-		err = fmt.Errorf("status code is't 200")
-		entry.WithError(err).WithField("body", string(body)).Error()
+		err = fmt.Errorf("StatusCode %d != 200", resp.StatusCode)
+		entry.WithError(err).Error()
 		return
 	}
 }

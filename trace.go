@@ -170,16 +170,17 @@ func Metrics(notLogged ...string) gin.HandlerFunc {
 			end := time.Now()
 			latency := end.Sub(start)
 
-			logrus.WithFields(logrus.Fields{
-				"statusCode": statusCode,
-				"latency":    fmt.Sprintf("%v", latency),
-				"clientIP":   clientIP,
-				"method":     method,
-				"path":       path,
-				"comment":    comment,
-			}).Info()
-
 			if statusCode != http.StatusNotFound {
+				//404不打日志
+				logrus.WithFields(logrus.Fields{
+					"statusCode": statusCode,
+					"latency":    fmt.Sprintf("%v", latency),
+					"clientIP":   clientIP,
+					"method":     method,
+					"path":       path,
+					"comment":    comment,
+				}).Info()
+
 				elapsed := latency.Seconds() * 1000.0
 				ResponseCounter.WithLabelValues(method, path).Inc()
 				ErrorCounter.WithLabelValues(strconv.FormatInt(int64(statusCode), 10),
