@@ -3,31 +3,59 @@ package zlutils
 import (
 	"fmt"
 	"github.com/lestrrat/go-file-rotatelogs"
-	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
+	"io"
+	"io/ioutil"
 	"os"
 	"time"
 )
 
 type MyFormatter struct {
-	logrus.Formatter
+	logrus.JSONFormatter
+	WriterMap map[logrus.Level]io.Writer
 }
 
-func (f MyFormatter) Format(e *logrus.Entry) ([]byte, error) {
+func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
+	LogCounter.WithLabelValues(e.Level.String()).Inc()
 	if e.Level != logrus.InfoLevel {
-		//获取位置影响性能，所以忽略info，如果设置打印级别高于debug，则Debug()不会调用这里
-		//使用stack而不是source，因为skip会发生变化
-		//stack的skip=3是为了忽略这几个函数Format GetStack GetSource
-		if _, ok := e.Data["stack"]; !ok {
-			//允许外部记录stack，而不覆盖
-			e.Data["stack"] = GetStack(3)
+		if stack, ok := e.Data["stack"]; !ok {
+			e.Data["stack"] = GetStack(3) //允许外部记录stack，而不覆盖
+		} else if stack == nil {
+			delete(e.Data, "stack") //如果被置为nil则不输出
 		}
 	}
 	e.Time = e.Time.UTC() //改成UTC时间
-	return f.Formatter.Format(e)
+	serialized, err = f.JSONFormatter.Format(e)
+	if err != nil {
+		return
+	}
+	err = f.write(e.Level, serialized)
+	return
 }
 
-func getLogWriter(level string) *rotatelogs.RotateLogs {
+func (f MyFormatter) write(level logrus.Level, serialized []byte) (err error) {
+	if writer := f.WriterMap[level]; writer != nil {
+		if _, err = writer.Write(serialized); err != nil {
+			return
+		}
+	}
+	//debug模式
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		//输出到屏幕
+		os.Stderr.Write(serialized)
+		if level != logrus.DebugLevel {
+			//其他日志同时输出到debug.log
+			if writer := f.WriterMap[logrus.DebugLevel]; writer != nil {
+				if _, err = writer.Write(serialized); err != nil {
+					return
+				}
+			}
+		}
+	}
+	return
+}
+
+func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
 	dir := fmt.Sprintf("/data/logs/%s", ProjectName)
 	path := fmt.Sprintf("%s/%s.log", dir, level)
 	if _, err := os.Stat(dir); err != nil || os.IsNotExist(err) {
@@ -41,9 +69,9 @@ func getLogWriter(level string) *rotatelogs.RotateLogs {
 		rotatelogs.WithClock(rotatelogs.UTC), //默认loc，改成UTC
 		//每天分割
 		rotatelogs.WithRotationTime(time.Hour*24), //默认24h
-		//最多7个文件，配合每天分割文件，则是每7天删除旧日志
+		//最多3个文件，配合每天分割文件，则是每3天删除旧日志
 		rotatelogs.WithMaxAge(-1),       //默认7*24h，配合次数时需显式设为-1关闭
-		rotatelogs.WithRotationCount(7), //默认-1
+		rotatelogs.WithRotationCount(3), //默认-1
 	)
 	if err != nil {
 		panic(err)
@@ -56,50 +84,16 @@ func InitLog(release bool) {
 		logrus.SetLevel(logrus.DebugLevel) //默认info
 	}
 
-	formatter := MyFormatter{&logrus.JSONFormatter{}}
-	logrus.SetFormatter(formatter) //用于屏幕输出格式化
-
-	debugWriter := getLogWriter("debug")
-	infoWriter := getLogWriter("info")
-	warnWriter := getLogWriter("warn")
-	errorWriter := getLogWriter("error")
-	//高级别的日志同时也写到低级别的文件中
-	logrus.AddHook(lfshook.NewHook(
-		lfshook.WriterMap{
+	errorWriter := getLogWriter(logrus.ErrorLevel)
+	logrus.SetFormatter(MyFormatter{
+		WriterMap: map[logrus.Level]io.Writer{
 			logrus.FatalLevel: errorWriter,
 			logrus.PanicLevel: errorWriter,
 			logrus.ErrorLevel: errorWriter,
+			logrus.WarnLevel:  getLogWriter(logrus.WarnLevel),
+			logrus.InfoLevel:  getLogWriter(logrus.InfoLevel),
+			logrus.DebugLevel: getLogWriter(logrus.DebugLevel),
 		},
-		formatter,
-	))
-	logrus.AddHook(lfshook.NewHook(
-		lfshook.WriterMap{
-			logrus.FatalLevel: warnWriter,
-			logrus.PanicLevel: warnWriter,
-			logrus.ErrorLevel: warnWriter,
-			logrus.WarnLevel:  warnWriter,
-		},
-		formatter,
-	))
-	logrus.AddHook(lfshook.NewHook(
-		lfshook.WriterMap{
-			logrus.FatalLevel: infoWriter,
-			logrus.PanicLevel: infoWriter,
-			logrus.ErrorLevel: infoWriter,
-			logrus.WarnLevel:  infoWriter,
-			logrus.InfoLevel:  infoWriter,
-		},
-		formatter,
-	))
-	logrus.AddHook(lfshook.NewHook(
-		lfshook.WriterMap{
-			logrus.FatalLevel: debugWriter,
-			logrus.PanicLevel: debugWriter,
-			logrus.ErrorLevel: debugWriter,
-			logrus.WarnLevel:  debugWriter,
-			logrus.InfoLevel:  debugWriter,
-			logrus.DebugLevel: debugWriter,
-		},
-		formatter,
-	))
+	})
+	logrus.SetOutput(ioutil.Discard)
 }

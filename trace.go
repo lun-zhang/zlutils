@@ -29,6 +29,8 @@ var (
 	MysqlCounter    *prometheus.CounterVec   //mysql查询次数
 	MysqlLatency    *prometheus.HistogramVec //mysql耗时
 
+	LogCounter *prometheus.CounterVec //log次数
+
 	sn *xray.FixedSegmentNamer
 )
 
@@ -71,6 +73,14 @@ func InitTrace() {
 		[]string{"method"}, //method=SELECT INSERT DELETE UPDATE
 	)
 
+	LogCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_log_total", ProjectName),
+			Help: "Total Log counts",
+		},
+		[]string{"level"},
+	)
+
 	sn = xray.NewFixedSegmentNamer(ProjectName)
 
 	prometheus.MustRegister(
@@ -79,6 +89,7 @@ func InitTrace() {
 		ResponseLatency,
 		MysqlCounter,
 		MysqlLatency,
+		LogCounter,
 	)
 
 	xray.Configure(xray.Config{
