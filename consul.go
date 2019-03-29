@@ -36,7 +36,7 @@ func (v *WatchedParam) Set(value string) {
 	v.value = value
 }
 
-func getSingle(key string) (value string) {
+func GetValue(key string) (value []byte) {
 	key = fmt.Sprintf("%s/%s", Prefix, key)
 	pair, _, err := KV.Get(key, nil)
 	if err != nil {
@@ -46,16 +46,15 @@ func getSingle(key string) (value string) {
 		err = fmt.Errorf("consul has't key")
 		logrus.WithError(err).WithField("key", key).Fatal()
 	}
-	value = string(pair.Value)
-	return
+	return pair.Value
 }
 
-func GetSingle(key string, i interface{}) {
-	value := getSingle(key)
-	if err := json.Unmarshal([]byte(value), i); err != nil {
+func UnmarshalJson(key string, i interface{}) {
+	value := GetValue(key)
+	if err := json.Unmarshal(value, i); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"key":   key,
-			"value": value,
+			"value": string(value),
 		}).Fatal("consul key invalid")
 	}
 	logrus.WithFields(logrus.Fields{
