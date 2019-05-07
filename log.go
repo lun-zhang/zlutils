@@ -24,7 +24,8 @@ func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 			delete(e.Data, "stack") //如果被置为nil则不输出
 		}
 	}
-	e.Time = e.Time.UTC() //改成UTC时间
+	e.Time = e.Time.UTC()               //改成UTC时间
+	e.Data["time_unix"] = e.Time.Unix() //方便grep查询范围
 	serialized, err = f.JSONFormatter.Format(e)
 	if err != nil {
 		return

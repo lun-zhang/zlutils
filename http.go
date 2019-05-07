@@ -83,87 +83,85 @@ func HttpGet(ctx context.Context, client *http.Client, url string, respBody inte
 	}
 }
 
-type apiCode struct {
+type ApiCode struct {
 	Code    int         `json:"ret"`
 	Message string      `json:"msg"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
+//强行加
+func (code ApiCode) AppendMsgForce(msg string) ApiCode {
+	if msg != "" {
+		code.Message = fmt.Sprintf("%s: %s", code.Message, msg)
+	}
+	return code
+}
+
+//只有debug模式才行
+func (code ApiCode) AppendMsgDebug(msg string) ApiCode {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		return code.AppendMsgForce(msg)
+	}
+	return code
+}
+
 // 成功
-func RespSuccess(data interface{}) (int, apiCode) {
-	logrus.WithFields(logrus.Fields{
-		"stack":  nil, //这里的stack没意义，显式关闭
-		"source": GetSource(2),
-		"data":   data,
-	}).Debug()
-	return http.StatusOK, apiCode{
+func RespSuccess(data interface{}) (int, ApiCode) {
+	return Resp(ApiCode{
 		Code:    0,
 		Message: "success",
 		Data:    data,
-	}
+	}, "")
 }
 
-// 校验query参数失败
-func RespErrorQueryParams(err error) (int, apiCode) {
-	if err != nil {
-		//当外部打印日志后，应当传err=nil，免得重复打日志
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"stack":  nil, //这里的stack没意义，显式关闭
-			"source": GetSource(2),
-		}).Warn()
-	}
-	return http.StatusBadRequest, apiCode{
-		Code:    1002,
-		Message: "verify query params failed",
-	}
-}
+/*
+ret统一，方便prometheus统计
+正确:			0
+客户端参数错误:	40xx
+客户端逻辑错误:	41xx
+服务器错误:		5xxx
+*/
 
-// 服务器错误
-func RespErrorServer() (int, apiCode) {
-	return http.StatusInternalServerError, apiCode{
-		Code:    1000,
-		Message: "server error",
-	}
+func Resp(code ApiCode, msg string) (int, ApiCode) {
+	return http.StatusOK, code.AppendMsgDebug(msg)
 }
 
 // 请求失败
-func RespErrorRequestFailed(err error) (int, apiCode) {
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"stack":  nil, //这里的stack没意义，显式关闭
-			"source": GetSource(2),
-		}).Warn()
-	}
-	return http.StatusBadRequest, apiCode{
-		Code:    1001,
+func RespErrorRequestFailed(msg string) (int, ApiCode) {
+	return Resp(ApiCode{
+		Code:    4001,
 		Message: "request failed",
-	}
+	}, msg)
+}
+
+// 校验query参数失败
+func RespErrorQueryParams(msg string) (int, ApiCode) {
+	return Resp(ApiCode{
+		Code:    4002,
+		Message: "verify query params failed",
+	}, msg)
 }
 
 // 校验post参数失败
-func RespErrorPostParams(err error) (int, apiCode) {
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"stack":  nil, //这里的stack没意义，显式关闭
-			"source": GetSource(2),
-		}).Warn()
-	}
-	return http.StatusBadRequest, apiCode{
-		Code:    1004,
+func RespErrorPostParams(msg string) (int, ApiCode) {
+	return Resp(ApiCode{
+		Code:    4004,
 		Message: "verify post params failed",
-	}
+	}, msg)
 }
 
 // 校验header参数失败
-func RespErrorHeaderParams(err error) (int, apiCode) {
-	if err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"stack":  nil, //这里的stack没意义，显式关闭
-			"source": GetSource(2),
-		}).Warn()
-	}
-	return http.StatusBadRequest, apiCode{
-		Code:    1005,
+func RespErrorHeaderParams(msg string) (int, ApiCode) {
+	return Resp(ApiCode{
+		Code:    4005,
 		Message: "verify header params failed",
-	}
+	}, msg)
+}
+
+// 服务器错误
+func RespErrorServer(msg string) (int, ApiCode) {
+	return Resp(ApiCode{
+		Code:    5000,
+		Message: "server error",
+	}, msg)
 }

@@ -99,107 +99,96 @@ func InitTrace() {
 	})
 }
 
-func Metrics(notLogged ...string) gin.HandlerFunc {
-	var skip map[string]struct{}
-
-	if length := len(notLogged); length > 0 {
-		skip = make(map[string]struct{}, length)
-
-		for _, path := range notLogged {
-			skip[path] = struct{}{}
-		}
-	}
-
+//不需要skip，不需要的接口不用此中间件即可
+func Metrics() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		r := c.Request
-		path := r.URL.Path
-		if _, ok := skip[path]; ok {
-			// Process request
-			c.Next()
-		} else {
-			// Start timer
-			start := time.Now()
+		// Start timer
+		start := time.Now()
 
-			// xray http trace before operation
-			name := sn.Name(c.Request.Host)
-			traceHeader := header.FromString(r.Header.Get("x-amzn-trace-id"))
-			ctx, seg := xray.NewSegmentFromHeader(r.Context(), name, traceHeader)
-			r = r.WithContext(ctx)
-			c.Request = r
-			seg.Lock()
+		// xray http trace before operation
+		name := sn.Name(c.Request.Host)
+		traceHeader := header.FromString(r.Header.Get("x-amzn-trace-id"))
+		ctx, seg := xray.NewSegmentFromHeader(r.Context(), name, traceHeader)
+		r = r.WithContext(ctx)
+		c.Request = r
+		seg.Lock()
 
-			scheme := "https://"
-			if r.TLS == nil {
-				scheme = "http://"
-			}
-			seg.GetHTTP().GetRequest().Method = r.Method
-			seg.GetHTTP().GetRequest().URL = scheme + r.Host + r.URL.Path
-			seg.GetHTTP().GetRequest().ClientIP, seg.GetHTTP().GetRequest().XForwardedFor = clientIP(r)
-			seg.GetHTTP().GetRequest().UserAgent = r.UserAgent()
+		scheme := "https://"
+		if r.TLS == nil {
+			scheme = "http://"
+		}
+		seg.GetHTTP().GetRequest().Method = r.Method
+		seg.GetHTTP().GetRequest().URL = scheme + r.Host + r.URL.Path
+		seg.GetHTTP().GetRequest().ClientIP, seg.GetHTTP().GetRequest().XForwardedFor = clientIP(r)
+		seg.GetHTTP().GetRequest().UserAgent = r.UserAgent()
 
-			var respHeader bytes.Buffer
-			respHeader.WriteString("Root=")
-			respHeader.WriteString(seg.TraceID)
+		var respHeader bytes.Buffer
+		respHeader.WriteString("Root=")
+		respHeader.WriteString(seg.TraceID)
 
-			if traceHeader.SamplingDecision != header.Sampled && traceHeader.SamplingDecision != header.NotSampled {
-				seg.Sampled = seg.ParentSegment.GetConfiguration().SamplingStrategy.ShouldTrace(r.Host, r.URL.Path, r.Method)
-				xlog.Tracef("SamplingStrategy decided: %t", seg.Sampled)
-			}
-			if traceHeader.SamplingDecision == header.Requested {
-				respHeader.WriteString(";Sampled=")
-				respHeader.WriteString(strconv.Itoa(btoi(seg.Sampled)))
-			}
-
-			c.Writer.Header().Set("x-amzn-trace-id", respHeader.String())
-			seg.Unlock()
-
-			// Process request
-			c.Next()
-
-			clientIP := c.ClientIP()
-			method := c.Request.Method
-			statusCode := c.Writer.Status()
-			comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
-
-			seg.Lock()
-			seg.GetHTTP().GetResponse().Status = c.Writer.Status()
-			seg.GetHTTP().GetResponse().ContentLength, _ = strconv.Atoi(c.Writer.Header().Get("Content-Length"))
-
-			if statusCode >= 400 && statusCode < 500 {
-				seg.Error = true
-			}
-			if statusCode == 429 {
-				seg.Throttle = true
-			}
-			if statusCode >= 500 && statusCode < 600 {
-				seg.Fault = true
-			}
-			seg.Unlock()
-			seg.Close(nil)
-
-			// Stop timer
-			end := time.Now()
-			latency := end.Sub(start)
-
-			if statusCode != http.StatusNotFound {
-				//404不打日志
-				logrus.WithFields(logrus.Fields{
-					"statusCode": statusCode,
-					"latency":    fmt.Sprintf("%v", latency),
-					"clientIP":   clientIP,
-					"method":     method,
-					"path":       path,
-					"comment":    comment,
-				}).Info()
-
-				elapsed := latency.Seconds() * 1000.0
-				ResponseCounter.WithLabelValues(method, path).Inc()
-				ErrorCounter.WithLabelValues(strconv.FormatInt(int64(statusCode), 10),
-					fmt.Sprintf("%s-%s", path, method)).Inc()
-				ResponseLatency.WithLabelValues(method, path).Observe(elapsed)
-			}
+		if traceHeader.SamplingDecision != header.Sampled && traceHeader.SamplingDecision != header.NotSampled {
+			seg.Sampled = seg.ParentSegment.GetConfiguration().SamplingStrategy.ShouldTrace(r.Host, r.URL.Path, r.Method)
+			xlog.Tracef("SamplingStrategy decided: %t", seg.Sampled)
+		}
+		if traceHeader.SamplingDecision == header.Requested {
+			respHeader.WriteString(";Sampled=")
+			respHeader.WriteString(strconv.Itoa(btoi(seg.Sampled)))
 		}
 
+		c.Writer.Header().Set("x-amzn-trace-id", respHeader.String())
+		seg.Unlock()
+
+		// Process request
+		c.Next()
+
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+		comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
+
+		seg.Lock()
+		seg.GetHTTP().GetResponse().Status = c.Writer.Status()
+		seg.GetHTTP().GetResponse().ContentLength, _ = strconv.Atoi(c.Writer.Header().Get("Content-Length"))
+
+		if statusCode >= 400 && statusCode < 500 {
+			seg.Error = true
+		}
+		if statusCode == 429 {
+			seg.Throttle = true
+		}
+		if statusCode >= 500 && statusCode < 600 {
+			seg.Fault = true
+		}
+		seg.Unlock()
+		seg.Close(nil)
+
+		// Stop timer
+		end := time.Now()
+		latency := end.Sub(start)
+
+		if statusCode != http.StatusNotFound {
+			//404不打日志
+			path := r.URL.Path
+			entry := logrus.WithFields(logrus.Fields{
+				"statusCode": statusCode,
+				"latency":    fmt.Sprintf("%v", latency),
+				"clientIP":   clientIP,
+				"method":     method,
+				"path":       path,
+				"comment":    comment,
+			})
+			entry.Info()
+			if latency > 500*time.Millisecond {
+				entry.Warn("slow api")
+			}
+
+			elapsed := latency.Seconds() * 1000.0
+			ResponseCounter.WithLabelValues(method, path).Inc()
+			ErrorCounter.WithLabelValues(strconv.FormatInt(int64(statusCode), 10),
+				fmt.Sprintf("%s-%s", path, method)).Inc()
+			ResponseLatency.WithLabelValues(method, path).Observe(elapsed)
+		}
 	}
 }
 
