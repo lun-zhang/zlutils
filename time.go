@@ -35,7 +35,7 @@ func (t JsonTime) MarshalJSON() ([]byte, error) {
 }
 
 func (t JsonTime) Value() (driver.Value, error) {
-	return t, nil
+	return time.Time(t), nil
 }
 
 func (t *JsonTime) Scan(src interface{}) error {
