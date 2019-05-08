@@ -50,18 +50,47 @@ type User struct {
 	AcceptLanguage string
 }
 
+func GetAdminOperator(c *gin.Context) AdminOperator {
+	v, _ := c.Get(KeyAdminOperator)
+	return v.(AdminOperator)
+}
+
+func GetUser(c *gin.Context) User {
+	v, _ := c.Get(KeyUser)
+	return v.(User)
+}
+
+const (
+	ProductIdVideoBuddy = 39
+	ProductIdVclip      = 45
+)
+
 func MidUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var user User
-		header := c.Request.Header
-		user = User{
-			UserId:         header.Get("User-Id"),
-			DeviceId:       header.Get("Device-Id"),
-			AcceptLanguage: header.Get("Accept-Language"),
-		}
-		user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
-		if user.UserId == "" && user.DeviceId == "" {
-			c.JSON(RespErrorHeaderParams("invalid user, User-Id and Device-Id are empty"))
+		user, err := func(c *gin.Context) (user User, err error) {
+			header := c.Request.Header
+			user = User{
+				UserId:         header.Get("User-Id"),
+				DeviceId:       header.Get("Device-Id"),
+				AcceptLanguage: header.Get("Accept-Language"),
+			}
+			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
+			switch user.ProductId {
+			case ProductIdVclip: //NOTE: vclip一定有User-Id
+				if user.UserId == "" {
+					err = fmt.Errorf("User-Id is empty")
+					return
+				}
+			default:
+				if user.UserId == "" && user.DeviceId == "" {
+					err = fmt.Errorf("User-Id and Device-Id are empty")
+					return
+				}
+			}
+			return
+		}(c)
+		if err != nil {
+			c.JSON(RespErrorHeaderParams(fmt.Sprintf("invalid user, %s", err.Error())))
 			c.Abort()
 			return
 		}
