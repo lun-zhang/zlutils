@@ -50,14 +50,13 @@ type User struct {
 	AcceptLanguage string
 }
 
+//NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
 func GetAdminOperator(c *gin.Context) AdminOperator {
-	v, _ := c.Get(KeyAdminOperator)
-	return v.(AdminOperator)
+	return c.Value(KeyAdminOperator).(AdminOperator)
 }
 
 func GetUser(c *gin.Context) User {
-	v, _ := c.Get(KeyUser)
-	return v.(User)
+	return c.Value(KeyUser).(User)
 }
 
 const (
@@ -65,6 +64,7 @@ const (
 	ProductIdVclip      = 45
 )
 
+//FIXME 感觉这个不是公用的，不改放这里
 func MidUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := func(c *gin.Context) (user User, err error) {
