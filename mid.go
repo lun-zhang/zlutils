@@ -44,6 +44,7 @@ func MidAdminOperator() gin.HandlerFunc {
 }
 
 type User struct {
+	UserIdentity   string //NOTE: 不同产品的用户唯一标志不同
 	UserId         string
 	DeviceId       string
 	ProductId      int
@@ -70,22 +71,32 @@ func MidUser() gin.HandlerFunc {
 		user, err := func(c *gin.Context) (user User, err error) {
 			header := c.Request.Header
 			user = User{
+				//FIXME 从token中获得用户信息，兼容新token
 				UserId:         header.Get("User-Id"),
 				DeviceId:       header.Get("Device-Id"),
 				AcceptLanguage: header.Get("Accept-Language"),
 			}
 			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
 			switch user.ProductId {
-			case ProductIdVclip: //NOTE: vclip一定有User-Id
-				if user.UserId == "" {
-					err = fmt.Errorf("User-Id is empty")
+			case ProductIdVclip: //NOTE: vclip一定有Device-Id
+				if user.DeviceId == "" {
+					err = fmt.Errorf("Device-Id is empty")
 					return
 				}
-			default:
+				user.UserIdentity = user.DeviceId //NOTE: vclip以device_id为唯一身份
+			case ProductIdVideoBuddy:
 				if user.UserId == "" && user.DeviceId == "" {
 					err = fmt.Errorf("User-Id and Device-Id are empty")
 					return
 				}
+				//TODO VideoBuddy绑定关系
+				if user.UserId != "" {
+					user.UserIdentity = user.UserId //优先user-id
+				} else {
+					user.UserIdentity = user.DeviceId
+				}
+			default:
+				//TODO 后续增加新类型
 			}
 			return
 		}(c)
