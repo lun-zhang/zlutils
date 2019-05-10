@@ -78,9 +78,10 @@ func MidUser() gin.HandlerFunc {
 			}
 			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
 			switch user.ProductId {
-			case ProductIdVclip: //NOTE: vclip一定有Device-Id
-				if user.DeviceId == "" {
-					err = fmt.Errorf("Device-Id is empty")
+			case ProductIdVclip:
+				if user.UserId == "" || //NOTE: 既然vclip也一定有User-Id，就检查吧
+					user.DeviceId == "" { //NOTE: vclip一定有Device-Id
+					err = fmt.Errorf("User-Id or Device-Id is empty")
 					return
 				}
 				user.UserIdentity = user.DeviceId //NOTE: vclip以device_id为唯一身份
@@ -91,7 +92,7 @@ func MidUser() gin.HandlerFunc {
 				}
 				//TODO VideoBuddy绑定关系
 				if user.UserId != "" {
-					user.UserIdentity = user.UserId //优先user-id
+					user.UserIdentity = user.UserId //NOTE: videoBuddy优先user-id为唯一标志
 				} else {
 					user.UserIdentity = user.DeviceId
 				}
