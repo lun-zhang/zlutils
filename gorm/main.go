@@ -19,11 +19,14 @@ type ctxDB struct {
 }
 
 func (db ctxDB) beginSeg() (seg *xray.Segment) {
+	if db.ctx == nil {
+		panic("nil context, forget call WithContext?") //NOTE: 必须调用WithContext
+	}
 	_, seg = xray.BeginSubsegment(db.ctx, "mysql-"+db.source)
-	seg.Namespace = "remote"
 	return
 }
 func closeSeg(seg *xray.Segment, err error, query string, args ...interface{}) {
+	seg.Namespace = "remote"
 	seg.GetSQL().SanitizedQuery = PrintSql(query, args...)
 	seg.Close(err)
 }
