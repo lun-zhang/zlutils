@@ -23,7 +23,7 @@ func InitRedis(redisUrl string) (client *redis.Client) {
 			logrus.WithFields(logrus.Fields{
 				"redis-cmd": cmd.String(),
 				"duration":  end.Sub(begin).String(),
-				"source":    GetSource(2),
+				"source":    GetSource(5),
 				"stack":     nil,
 			}).Debug()
 			return err
