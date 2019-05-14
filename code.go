@@ -60,6 +60,9 @@ func CodeSend(c *gin.Context, data interface{}, err error) {
 	if logrus.IsLevelEnabled(logrus.DebugLevel) && code.Err != nil { //NOTE: err在debug模式拼接到msg上，正式环境不会输出
 		code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
 	}
+	if code.Ret != 0 {
+		data = nil //NOTE: 不是成功就不反回data
+	}
 	c.Set(KeyRet, code.Ret) //保存ret用于metrics
 	c.JSON(http.StatusOK, Result{
 		Code: code,
