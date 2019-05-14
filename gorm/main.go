@@ -1,13 +1,57 @@
 package gorm
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-xray-sdk-go/xray"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 	"time"
 )
+
+type ctxDB struct {
+	db     SQLCommon
+	ctx    context.Context
+	source string
+}
+
+func (db ctxDB) beginSeg() (seg *xray.Segment) {
+	_, seg = xray.BeginSubsegment(db.ctx, "mysql-"+db.source)
+	seg.Namespace = "remote"
+	return
+}
+func closeSeg(seg *xray.Segment, err error, query string, args ...interface{}) {
+	seg.GetSQL().SanitizedQuery = PrintSql(query, args...)
+	seg.Close(err)
+}
+
+func (db ctxDB) Exec(query string, args ...interface{}) (result sql.Result, err error) {
+	seg := db.beginSeg()
+	result, err = db.db.Exec(query, args...) //FIXME: 是否想需要替换成ExecContent
+	closeSeg(seg, err, query, args...)
+	return
+}
+func (db ctxDB) Prepare(query string) (stmt *sql.Stmt, err error) {
+	seg := db.beginSeg()
+	stmt, err = db.db.Prepare(query)
+	closeSeg(seg, err, query)
+	return
+}
+func (db ctxDB) Query(query string, args ...interface{}) (rows *sql.Rows, err error) {
+	seg := db.beginSeg()
+	rows, err = db.db.Query(query, args...)
+	closeSeg(seg, err, query, args...)
+	return
+}
+func (db ctxDB) QueryRow(query string, args ...interface{}) (row *sql.Row) {
+	seg := db.beginSeg()
+	row = db.db.QueryRow(query, args...)
+	closeSeg(seg, nil, query, args...)
+	return
+}
 
 // DB contains information for current db connection
 type DB struct {
@@ -16,7 +60,7 @@ type DB struct {
 	RowsAffected int64
 
 	// single db
-	db                SQLCommon
+	db                ctxDB //interface改成struct
 	blockGlobalUpdate bool
 	logMode           int
 	logger            logger
@@ -66,7 +110,9 @@ func Open(dialect string, args ...interface{}) (db *DB, err error) {
 	}
 
 	db = &DB{
-		db:        dbSQL,
+		db: ctxDB{
+			db: dbSQL,
+		},
 		logger:    defaultLogger,
 		values:    map[string]interface{}{},
 		callbacks: DefaultCallback,
@@ -93,13 +139,24 @@ func (s *DB) New() *DB {
 	return clone
 }
 
+//NOTE: db.WithContext(ctx).Find()肯定没问题
+func (s *DB) WithContext(ctx context.Context) *DB { //模仿redis
+	if ctx == nil {
+		panic("nil context")
+	}
+	clone := s.clone()
+	clone.db.ctx = ctx
+	clone.db.source = GetSource(2)
+	return clone
+}
+
 type closer interface {
 	Close() error
 }
 
 // Close close current db connection.  If database connection is not an io.Closer, returns an error.
 func (s *DB) Close() error {
-	if db, ok := s.parent.db.(closer); ok {
+	if db, ok := s.parent.db.db.(closer); ok {
 		return db.Close()
 	}
 	return errors.New("can't close current db")
@@ -108,7 +165,7 @@ func (s *DB) Close() error {
 // DB get `*sql.DB` from current connection
 // If the underlying database connection is not a *sql.DB, returns nil
 func (s *DB) DB() *sql.DB {
-	db, _ := s.db.(*sql.DB)
+	db, _ := s.db.db.(*sql.DB)
 	return db
 }
 
@@ -481,9 +538,9 @@ func (s *DB) Debug() *DB {
 // Begin begin a transaction
 func (s *DB) Begin() *DB {
 	c := s.clone()
-	if db, ok := c.db.(sqlDb); ok && db != nil {
+	if db, ok := c.db.db.(sqlDb); ok && db != nil {
 		tx, err := db.Begin()
-		c.db = interface{}(tx).(SQLCommon)
+		c.db.db = interface{}(tx).(SQLCommon)
 		c.AddError(err)
 	} else {
 		c.AddError(ErrCantStartTransaction)
@@ -494,7 +551,7 @@ func (s *DB) Begin() *DB {
 // Commit commit a transaction
 func (s *DB) Commit() *DB {
 	var emptySQLTx *sql.Tx
-	if db, ok := s.db.(sqlTx); ok && db != nil && db != emptySQLTx {
+	if db, ok := s.db.db.(sqlTx); ok && db != nil && db != emptySQLTx {
 		s.AddError(db.Commit())
 	} else {
 		s.AddError(ErrInvalidTransaction)
@@ -505,12 +562,32 @@ func (s *DB) Commit() *DB {
 // Rollback rollback a transaction
 func (s *DB) Rollback() *DB {
 	var emptySQLTx *sql.Tx
-	if db, ok := s.db.(sqlTx); ok && db != nil && db != emptySQLTx {
+	if db, ok := s.db.db.(sqlTx); ok && db != nil && db != emptySQLTx {
 		s.AddError(db.Rollback())
 	} else {
 		s.AddError(ErrInvalidTransaction)
 	}
 	return s
+}
+
+func (s *DB) CloseTx(ctx context.Context, errp *error) {
+	_, seg := xray.BeginSubsegment(ctx, GetSource(2))
+	defer func() { seg.Close(*errp) }() //NOTE: defer func获取*errp返回时候的最终值
+
+	if *errp != nil {
+		if err := s.Rollback().Error; err != nil {
+			logrus.WithFields(logrus.Fields{
+				"error":          (*errp).Error(),
+				"rollback_error": err.Error(),
+			}).Error("rollback fail")
+			*errp = err
+		}
+	} else {
+		if err := s.Commit().Error; err != nil {
+			logrus.WithField("commit_error", err.Error()).Error("commit fail")
+			*errp = err
+		}
+	}
 }
 
 // NewRecord check if value's primary key is blank

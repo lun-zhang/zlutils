@@ -26,8 +26,8 @@ var NowFunc = func() time.Time {
 var commonInitialisms = []string{"API", "ASCII", "CPU", "CSS", "DNS", "EOF", "GUID", "HTML", "HTTP", "HTTPS", "ID", "IP", "JSON", "LHS", "QPS", "RAM", "RHS", "RPC", "SLA", "SMTP", "SSH", "TLS", "TTL", "UID", "UI", "UUID", "URI", "URL", "UTF8", "VM", "XML", "XSRF", "XSS"}
 var commonInitialismsReplacer *strings.Replacer
 
-var goSrcRegexp = regexp.MustCompile(`jinzhu/gorm/.*.go`)
-var goTestRegexp = regexp.MustCompile(`jinzhu/gorm/.*test.go`)
+var goSrcRegexp = regexp.MustCompile(`zlutils/gorm/.*.go`)
+var goTestRegexp = regexp.MustCompile(`zlutils/gorm/.*test.go`)
 
 func init() {
 	var commonInitialismsForReplacer []string
@@ -184,6 +184,14 @@ func fileWithLineNum() string {
 		}
 	}
 	return ""
+}
+
+func GetSource(skip int) (name string) {
+	name = "unknown"
+	if pc, _, line, ok := runtime.Caller(skip); ok {
+		name = fmt.Sprintf("%s:%d", runtime.FuncForPC(pc).Name(), line)
+	}
+	return
 }
 
 func isBlank(value reflect.Value) bool {
