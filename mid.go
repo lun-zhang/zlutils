@@ -35,7 +35,7 @@ func MidAdminOperator() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			c.JSON(RespErrorQueryParams(fmt.Sprintf("invalid operator, err:%s", err.Error())))
+			CodeSend(c, nil, CodeClientQueryParamsErr.WithError(fmt.Errorf("invalid operator, err:%s", err.Error())))
 			c.Abort()
 			return
 		}
@@ -102,7 +102,7 @@ func MidUser() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			c.JSON(RespErrorHeaderParams(fmt.Sprintf("invalid user, %s", err.Error())))
+			CodeSend(c, nil, CodeClientHeaderParamsErr.WithError(fmt.Errorf("invalid user, %s", err.Error())))
 			c.Abort()
 			return
 		}

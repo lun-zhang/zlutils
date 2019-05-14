@@ -23,11 +23,14 @@ var (
 	historyBuckets = [...]float64{
 		10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
-	ResponseCounter *prometheus.CounterVec
-	ErrorCounter    *prometheus.CounterVec
-	ResponseLatency *prometheus.HistogramVec
-	MysqlCounter    *prometheus.CounterVec   //mysql查询次数
-	MysqlLatency    *prometheus.HistogramVec //mysql耗时
+	ResponseCounter *prometheus.CounterVec   //请求次数
+	ResponseLatency *prometheus.HistogramVec //请求耗时，用于alert
+
+	ServerErrorCounter *prometheus.CounterVec //服务器错误，用于alter
+	ClientErrorCounter *prometheus.CounterVec //客户端错误
+
+	MysqlCounter *prometheus.CounterVec   //mysql查询次数
+	MysqlLatency *prometheus.HistogramVec //mysql耗时
 
 	LogCounter *prometheus.CounterVec //log次数
 
@@ -40,14 +43,21 @@ func InitTrace() {
 			Name: fmt.Sprintf("%s_requests_total", ProjectName),
 			Help: "Total request counts",
 		},
-		[]string{"method", "endpoint"},
+		[]string{"endpoint"},
 	)
-	ErrorCounter = prometheus.NewCounterVec(
+	ServerErrorCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_error_total", ProjectName),
-			Help: "Total Error counts",
+			Name: fmt.Sprintf("%s_server_error_total", ProjectName),
+			Help: "Total Server Error counts",
 		},
-		[]string{"method", "endpoint"},
+		[]string{"endpoint", "ret"},
+	)
+	ClientErrorCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_client_error_total", ProjectName),
+			Help: "Total Client Error counts",
+		},
+		[]string{"endpoint", "ret"},
 	)
 	ResponseLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -55,7 +65,7 @@ func InitTrace() {
 			Help:    "Response latency (millisecond)",
 			Buckets: historyBuckets[:],
 		},
-		[]string{"method", "endpoint"},
+		[]string{"endpoint"},
 	)
 	MysqlCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -85,7 +95,8 @@ func InitTrace() {
 
 	prometheus.MustRegister(
 		ResponseCounter,
-		ErrorCounter,
+		ServerErrorCounter,
+		ClientErrorCounter,
 		ResponseLatency,
 		MysqlCounter,
 		MysqlLatency,
@@ -143,7 +154,6 @@ func Metrics() gin.HandlerFunc {
 		c.Next()
 
 		clientIP := c.ClientIP()
-		method := c.Request.Method
 		statusCode := c.Writer.Status()
 		comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
 
@@ -169,13 +179,12 @@ func Metrics() gin.HandlerFunc {
 
 		if statusCode != http.StatusNotFound {
 			//404不打日志
-			path := r.URL.Path
+			endpoint := fmt.Sprintf("%s-%s", r.URL.Path, c.Request.Method)
 			entry := logrus.WithFields(logrus.Fields{
 				"statusCode": statusCode,
 				"latency":    fmt.Sprintf("%v", latency),
 				"clientIP":   clientIP,
-				"method":     method,
-				"path":       path,
+				"endpoint":   endpoint,
 				"comment":    comment,
 			})
 			entry.Info()
@@ -184,10 +193,15 @@ func Metrics() gin.HandlerFunc {
 			}
 
 			elapsed := latency.Seconds() * 1000.0
-			ResponseCounter.WithLabelValues(method, path).Inc()
-			ErrorCounter.WithLabelValues(strconv.FormatInt(int64(statusCode), 10),
-				fmt.Sprintf("%s-%s", path, method)).Inc()
-			ResponseLatency.WithLabelValues(method, path).Observe(elapsed)
+
+			ret := c.Value(KeyRet).(int)
+			if ret >= 4000 && ret < 5000 {
+				ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+			} else if ret >= 5000 && ret < 6000 {
+				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+			}
+			ResponseCounter.WithLabelValues(endpoint).Inc()
+			ResponseLatency.WithLabelValues(endpoint).Observe(elapsed)
 		}
 	}
 }

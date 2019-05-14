@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"net/http"
 	"net/http/httputil"
+	"strconv"
 )
 
 var (
@@ -22,18 +22,20 @@ var (
 func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
-			if err := recover(); err != nil {
-				endPoint := c.Request.URL.Path
+			if rec := recover(); rec != nil {
+				endpoint := fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
 				stack := stack(3)
 				httpRequest, _ := httputil.DumpRequest(c.Request, true)
-				logrus.WithField("error", err).Error()
 				logrus.WithFields(logrus.Fields{
 					"httpRequest": string(httpRequest),
 					"stack":       string(stack),
-				})
+					"recover":     rec,
+					"endpoint":    endpoint,
+				}).Error()
 
-				ErrorCounter.WithLabelValues(c.Request.Method, endPoint).Inc()
-				c.AbortWithStatus(http.StatusInternalServerError)
+				CodeSend(c, nil, CodeServerPaincErr.WithError(fmt.Errorf("panic recover: %s", rec)))
+				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(c.Value(KeyRet).(int))).Inc()
+				c.Abort()
 			}
 		}()
 		c.Next()
