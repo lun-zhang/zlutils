@@ -7,31 +7,10 @@ import (
 	"zlutils/gorm"
 )
 
-//NOTE 只能用于初始化，失败则fatal
-func InitDB(my MysqlConfig) *gorm.DB {
-	entry := logrus.WithField("my", my)
-	var err error
-	db, err := gorm.Open("mysql", my.Url)
-	if err != nil {
-		entry.WithError(err).Fatal("mysql connect fail")
-	}
-	db.DB().SetMaxOpenConns(my.MaxOpenConns)
-	db.DB().SetMaxIdleConns(my.MaxIdleConns)
-	db.LogMode(true).SetLogger(&dbLogger{})
-	entry.Info("mysql connect ok")
-	return db
-}
-
-type MysqlConfig struct {
-	Url          string `json:"url"`
-	MaxOpenConns int    `json:"max_open_conns"`
-	MaxIdleConns int    `json:"max_idle_conns"`
-}
-
-type dbLogger struct{}
+type DBLogger struct{}
 
 //NOTE: 打印到logrus、trace、xray
-func (l dbLogger) Print(values ...interface{}) {
+func (l DBLogger) Print(values ...interface{}) {
 	if len(values) <= 1 {
 		return
 	}
