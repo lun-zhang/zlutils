@@ -13,11 +13,6 @@ import (
 
 func HttpPost(ctx context.Context, client *http.Client, url string, reqBody interface{}, respBody interface{}) (err error) {
 	defer BeginSubsegment(&ctx)()
-	defer func() {
-		if err != nil {
-			err = CodeServerRpcErr.WithError(err)
-		}
-	}()
 
 	entry := logrus.WithFields(logrus.Fields{
 		"url":     url,
@@ -58,11 +53,6 @@ func HttpPost(ctx context.Context, client *http.Client, url string, reqBody inte
 
 func HttpGet(ctx context.Context, client *http.Client, url string, respBody interface{}) (err error) {
 	defer BeginSubsegment(&ctx)()
-	defer func() {
-		if err != nil {
-			err = CodeServerRpcErr.WithError(err)
-		}
-	}()
 
 	entry := logrus.WithField("url", url)
 
