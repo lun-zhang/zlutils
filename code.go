@@ -53,7 +53,7 @@ func CodeSend(c *gin.Context, data interface{}, err error) {
 	} else {
 		var ok bool
 		if code, ok = err.(Code); !ok {
-			code = CodeServerErr //NOTE: 未定义的会被认为是服务器错误，因此客户端错误一定都要定义
+			code = CodeServerErr.WithError(err) //NOTE: 未定义的会被认为是服务器错误，因此客户端错误一定都要定义
 		}
 	}
 
