@@ -20,12 +20,16 @@ type ctxDB struct {
 
 func (db ctxDB) beginSeg() (seg *xray.Segment) {
 	if db.ctx == nil {
-		panic("nil context, forget call WithContext?") //NOTE: 必须调用WithContext
+		logrus.Warn("nil context, forget call WithContext?") //只是warn而不是panic，免得不小心没用WithContext导致服务不可用
+		return
 	}
 	_, seg = xray.BeginSubsegment(db.ctx, "mysql-"+db.source)
 	return
 }
 func closeSeg(seg *xray.Segment, err error, query string, args ...interface{}) {
+	if seg == nil {
+		return
+	}
 	seg.Namespace = "remote"
 	seg.GetSQL().SanitizedQuery = PrintSql(query, args...)
 	seg.Close(err)
