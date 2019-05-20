@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"time"
-	"zlutils/gorm"
+
+	"github.com/lun-zhang/gorm"
 )
 
 type DBLogger struct{}
@@ -24,7 +25,7 @@ func (l DBLogger) Print(values ...interface{}) {
 		// duration
 		duration := values[2].(time.Duration)
 		// sql
-		sql := gorm.PrintSql(values[3].(string), values[4].([]interface{})...)
+		sql := gorm.PrintSQL(values[3].(string), values[4].([]interface{})...)
 
 		entry = entry.WithFields(logrus.Fields{
 			"sql": sql,
@@ -49,4 +50,25 @@ func GetMethod(sql string) (method string) {
 		return unknown
 	}
 	return
+}
+
+//NOTE 只能用于初始化，失败则fatal
+func GetDB(my MysqlConfig) *gorm.DB {
+	entry := logrus.WithField("my", my)
+	var err error
+	db, err := gorm.Open("mysql", my.Url)
+	if err != nil {
+		entry.WithError(err).Fatal("mysql connect fail")
+	}
+	db.DB().SetMaxOpenConns(my.MaxOpenConns)
+	db.DB().SetMaxIdleConns(my.MaxIdleConns)
+	db.LogMode(true).SetLogger(&DBLogger{})
+	entry.Info("mysql connect ok")
+	return db
+}
+
+type MysqlConfig struct {
+	Url          string `json:"url"`
+	MaxOpenConns int    `json:"max_open_conns"`
+	MaxIdleConns int    `json:"max_idle_conns"`
 }

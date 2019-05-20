@@ -7,7 +7,7 @@ import (
 
 	"encoding/json"
 	consulApi "github.com/hashicorp/consul/api"
-	consulWatch "github.com/hashicorp/consul/watch"
+	consulWatch "github.com/hashicorp/consul/api/watch"
 	"github.com/sirupsen/logrus"
 	"reflect"
 )
