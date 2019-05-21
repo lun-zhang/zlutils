@@ -1,4 +1,4 @@
-module zlutils
+module xlbj-gitlab.xunlei.cn/oversea/zlutils
 
 go 1.12
 
