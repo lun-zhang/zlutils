@@ -72,7 +72,7 @@ func InitTrace() {
 			Name: fmt.Sprintf("%s_mysql_total", ProjectName),
 			Help: "Total Mysql counts",
 		},
-		[]string{"method"}, //method=SELECT INSERT DELETE UPDATE
+		[]string{"query"},
 	)
 	MysqlLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -80,7 +80,7 @@ func InitTrace() {
 			Help:    "Mysql latency (millisecond)",
 			Buckets: historyBuckets[:],
 		},
-		[]string{"method"}, //method=SELECT INSERT DELETE UPDATE
+		[]string{"query"},
 	)
 
 	LogCounter = prometheus.NewCounterVec(

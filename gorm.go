@@ -1,7 +1,6 @@
 package zlutils
 
 import (
-	"fmt"
 	"github.com/sirupsen/logrus"
 	"time"
 
@@ -25,10 +24,11 @@ func (l DBLogger) Print(values ...interface{}) {
 		// duration
 		duration := values[2].(time.Duration)
 		// sql
-		sql := gorm.PrintSQL(values[3].(string), values[4].([]interface{})...)
+		query := values[3].(string)
+		sql := gorm.PrintSQL(query, values[4].([]interface{})...)
 
 		entry = entry.WithFields(logrus.Fields{
-			"sql": sql,
+			"sql":                       sql,
 			"rows affected or returned": values[5],
 			"duration":                  duration.String(),
 		})
@@ -37,19 +37,11 @@ func (l DBLogger) Print(values ...interface{}) {
 		} else {
 			entry.Debug()
 		}
-		method := GetMethod(sql)
-		MysqlCounter.WithLabelValues(method).Inc()
-		MysqlLatency.WithLabelValues(method).Observe(duration.Seconds() * 1000)
+		MysqlCounter.WithLabelValues(query).Inc()
+		MysqlLatency.WithLabelValues(query).Observe(duration.Seconds() * 1000)
 	} else {
 		entry.Debug(values[2:]) //NOTE: error时候会先到这里，不打error日志，让外面去打，因为外面还有其他信息
 	}
-}
-
-func GetMethod(sql string) (method string) {
-	if _, err := fmt.Sscanf(sql, "%s", &method); err != nil {
-		return unknown
-	}
-	return
 }
 
 //NOTE 只能用于初始化，失败则fatal
