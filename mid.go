@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/redis.v5"
 	"io/ioutil"
 	"strconv"
+	"time"
 )
 
 type AdminOperator struct {
@@ -141,5 +143,41 @@ func MidLogReqResp() gin.HandlerFunc {
 		c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
 		c.Writer = LogDebugWriter{c.Writer}
 		c.Next()
+	}
+}
+
+//限制同一个人不可并发
+// 如果多个接口都用这个中间件，则接口之间也不能并发
+func MidLockUser(reConn *redis.Client, expiration time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := GetUser(c)
+		key := fmt.Sprintf("%s:lock:%d:%s", ProjectName, user.ProductId, user.UserIdentity)
+		cmdL := reConn.SetNX(key, nil, expiration)
+		ok, err := cmdL.Result()
+		entry := logrus.WithFields(logrus.Fields{
+			"redis-cmdL": cmdL.String(),
+			"user":       user,
+		})
+		if err != nil {
+			entry.WithError(err).Error()
+			CodeSend(c, nil, CodeServerMidRedisErr.WithError(err))
+			c.Abort()
+			return
+		}
+		if !ok {
+			entry.Warn("forbid concurrent")
+			CodeSend(c, nil, CodeClientForbidConcurrentErr)
+			c.Abort()
+			return
+		}
+		c.Next()
+		cmdU := reConn.Del(key)
+		entry = entry.WithField("redis-cmdU", cmdU.String())
+		if err = cmdU.Err(); err != nil {
+			entry.WithError(err).Error()
+			CodeSend(c, nil, CodeServerMidRedisErr.WithError(err))
+			c.Abort()
+			return
+		}
 	}
 }

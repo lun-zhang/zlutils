@@ -21,7 +21,7 @@ func Recovery() gin.HandlerFunc {
 					"endpoint":    endpoint,
 				}).Error()
 
-				CodeSend(c, nil, CodeServerPaincErr.WithError(fmt.Errorf("panic recover: %s", rec)))
+				CodeSend(c, nil, CodeServerMidPaincErr.WithError(fmt.Errorf("panic recover: %s", rec)))
 				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(c.Value(KeyRet).(int))).Inc()
 				c.Abort()
 			}

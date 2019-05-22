@@ -75,20 +75,24 @@ ret统一，方便prometheus统计
 正确:			0
 客户端参数错误:	40xx
 客户端逻辑错误:	41xx
+客户端其他错误:	42xx
 服务器错误:		50xx
 服务器rcp错误:	5100
+服务器中间件错误	52xx
 */
 
 var (
 	//成功
 	CodeSuccess = CodeAdd(0, "success")
 	//服务器错误，msg统一为server error，避免泄露服务器信息
-	CodeServerErr      = CodeAdd(5000, "server error")
-	CodeServerPaincErr = CodeAdd(5001, "server error") //panic，被recover了
-	CodeServerRpcErr   = CodeAdd(5100, "server error") //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
+	CodeServerErr         = CodeAdd(5000, "server error")
+	CodeServerMidPaincErr = CodeAdd(5201, "server error") //panic，被recover了
+	CodeServerMidRedisErr = CodeAdd(5202, "server error") //redis错误
+	CodeServerRpcErr      = CodeAdd(5100, "server error") //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
 	//客户端错误
-	CodeClientRequestErr      = CodeAdd(4000, "request failed")
-	CodeClientQueryParamsErr  = CodeAdd(4002, "verify query params failed")
-	CodeClientPostParamsErr   = CodeAdd(4004, "verify post params failed")
-	CodeClientHeaderParamsErr = CodeAdd(4005, "verify header params failed")
+	CodeClientRequestErr          = CodeAdd(4000, "request failed")
+	CodeClientQueryParamsErr      = CodeAdd(4002, "verify query params failed")
+	CodeClientPostParamsErr       = CodeAdd(4004, "verify post params failed")
+	CodeClientHeaderParamsErr     = CodeAdd(4005, "verify header params failed")
+	CodeClientForbidConcurrentErr = CodeAdd(4201, "forbid concurrent by same user")
 )
