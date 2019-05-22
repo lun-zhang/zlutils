@@ -17,6 +17,9 @@ func (code Code) WithError(err error) Code {
 	code.Err = err
 	return code
 }
+func (code Code) WithErrorf(format string, a ...interface{}) Code {
+	return code.WithError(fmt.Errorf(format, a...))
+}
 
 func (code Code) Error() string {
 	if code.Err != nil {
