@@ -194,12 +194,17 @@ func Metrics() gin.HandlerFunc {
 
 			elapsed := latency.Seconds() * 1000.0
 
-			ret := c.Value(KeyRet).(int)
-			if ret >= 4000 && ret < 5000 {
-				ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
-			} else if ret >= 5000 && ret < 6000 {
-				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+			ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
+			if ok {
+				if ret >= 4000 && ret < 5000 {
+					ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+				} else if ret >= 5000 && ret < 6000 {
+					ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+				}
+			} else {
+				entry.Warnf("invalid ret:%+v", c.Value(KeyRet))
 			}
+
 			ResponseCounter.WithLabelValues(endpoint).Inc()
 			ResponseLatency.WithLabelValues(endpoint).Observe(elapsed)
 		}
