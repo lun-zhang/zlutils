@@ -177,37 +177,37 @@ func Metrics() gin.HandlerFunc {
 		end := time.Now()
 		latency := end.Sub(start)
 
-		if statusCode != http.StatusNotFound {
-			//404不打日志
-			endpoint := fmt.Sprintf("%s-%s", r.URL.Path, c.Request.Method)
-			entry := logrus.WithFields(logrus.Fields{
-				"statusCode": statusCode,
-				"latency":    fmt.Sprintf("%v", latency),
-				"clientIP":   clientIP,
-				"endpoint":   endpoint,
-				"comment":    comment,
-			})
-			entry.Info()
-			if latency > 500*time.Millisecond {
-				entry.Warn("slow api")
-			}
-
-			elapsed := latency.Seconds() * 1000.0
-
-			ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
-			if ok {
-				if ret >= 4000 && ret < 5000 {
-					ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
-				} else if ret >= 5000 && ret < 6000 {
-					ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
-				}
-			} else {
-				entry.Warnf("invalid ret:%+v", c.Value(KeyRet))
-			}
-
-			ResponseCounter.WithLabelValues(endpoint).Inc()
-			ResponseLatency.WithLabelValues(endpoint).Observe(elapsed)
+		if statusCode == http.StatusNotFound {
+			c.Set(KeyRet, CodeClient404Err.Ret) //404也打日志
 		}
+		endpoint := fmt.Sprintf("%s-%s", r.URL.Path, c.Request.Method)
+		entry := logrus.WithFields(logrus.Fields{
+			"statusCode": statusCode,
+			"latency":    fmt.Sprintf("%v", latency),
+			"clientIP":   clientIP,
+			"endpoint":   endpoint,
+			"comment":    comment,
+		})
+		entry.Info()
+		if latency > 500*time.Millisecond {
+			entry.Warn("slow api")
+		}
+
+		elapsed := latency.Seconds() * 1000.0
+
+		ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
+		if ok {
+			if ret >= 4000 && ret < 5000 {
+				ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+			} else if ret >= 5000 && ret < 6000 {
+				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+			}
+		} else {
+			entry.Warnf("invalid ret:%+v", c.Value(KeyRet))
+		}
+
+		ResponseCounter.WithLabelValues(endpoint).Inc()
+		ResponseLatency.WithLabelValues(endpoint).Observe(elapsed)
 	}
 }
 

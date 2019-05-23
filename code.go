@@ -98,5 +98,6 @@ var (
 	CodeClientPostParamsErr       = CodeAdd(4004, "verify post params failed")
 	CodeClientHeaderParamsErr     = CodeAdd(4005, "verify header params failed")
 	CodeClientUriParamsErr        = CodeAdd(4006, "verify uri params failed")
+	CodeClient404Err              = CodeAdd(4040, "not found")
 	CodeClientForbidConcurrentErr = CodeAdd(4201, "forbid concurrent by same user")
 )
