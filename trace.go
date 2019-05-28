@@ -32,7 +32,11 @@ var (
 	MysqlCounter *prometheus.CounterVec   //mysql查询次数
 	MysqlLatency *prometheus.HistogramVec //mysql耗时
 
+	FuncCounter *prometheus.CounterVec   //func次数
+	FuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
+
 	LogCounter *prometheus.CounterVec //log次数
+	//写日志很快所以没有计时
 
 	sn *xray.FixedSegmentNamer
 )
@@ -86,6 +90,22 @@ func InitTrace() {
 		[]string{"query"},
 	)
 
+	FuncCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_func_total", ProjectName),
+			Help: "Total Func counts",
+		},
+		[]string{"func"},
+	)
+	FuncLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    fmt.Sprintf("%s_func_latency_millisecond", ProjectName),
+			Help:    "Func latency (millisecond)",
+			Buckets: historyBuckets[:],
+		},
+		[]string{"func"},
+	)
+
 	LogCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_log_total", ProjectName),
@@ -103,6 +123,8 @@ func InitTrace() {
 		ResponseLatency,
 		MysqlCounter,
 		MysqlLatency,
+		FuncCounter,
+		FuncLatency,
 		LogCounter,
 	)
 
@@ -270,6 +292,8 @@ func BeginSegment(ctxp *context.Context) func() {
 func CloseSeg(seg *xray.Segment) {
 	r := recover() //NOTE: 即使panic也要close
 	seg.Close(nil)
+	FuncCounter.WithLabelValues(seg.Name).Inc()
+	FuncLatency.WithLabelValues(seg.Name).Observe(seg.EndTime - seg.StartTime)
 	if r != nil {
 		panic(r) //NOTE： close后把panic抛出
 	}
