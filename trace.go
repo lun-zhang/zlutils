@@ -293,7 +293,7 @@ func CloseSeg(seg *xray.Segment) {
 	r := recover() //NOTE: 即使panic也要close
 	seg.Close(nil)
 	FuncCounter.WithLabelValues(seg.Name).Inc()
-	FuncLatency.WithLabelValues(seg.Name).Observe(seg.EndTime - seg.StartTime)
+	FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
 	if r != nil {
 		panic(r) //NOTE： close后把panic抛出
 	}

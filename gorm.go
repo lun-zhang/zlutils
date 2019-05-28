@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lun-zhang/gorm"
+	"strings"
 )
 
 type DBLogger struct{}
@@ -37,6 +38,7 @@ func (l DBLogger) Print(values ...interface{}) {
 		} else {
 			entry.Debug()
 		}
+		query = strings.Replace(query, "?,", "", -1) //FIXME 改成更好的做法，把IN(?,...)替换成IN(...)
 		MysqlCounter.WithLabelValues(query).Inc()
 		MysqlLatency.WithLabelValues(query).Observe(duration.Seconds() * 1000)
 	} else {
