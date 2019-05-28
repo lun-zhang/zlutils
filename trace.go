@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/header"
 	"github.com/aws/aws-xray-sdk-go/xray"
-	xlog "github.com/cihub/seelog"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strconv"
 	"time"
@@ -37,7 +37,10 @@ var (
 	sn *xray.FixedSegmentNamer
 )
 
+var pr *regexp.Regexp
+
 func InitTrace() {
+	pr = regexp.MustCompile(ProjectName)
 	ResponseCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_requests_total", ProjectName),
@@ -123,7 +126,7 @@ func Metrics() gin.HandlerFunc {
 		ctx, seg := xray.NewSegmentFromHeader(r.Context(), name, traceHeader)
 		r = r.WithContext(ctx)
 		c.Request = r
-		seg.Lock()
+		//seg.Lock()
 
 		scheme := "https://"
 		if r.TLS == nil {
@@ -140,7 +143,7 @@ func Metrics() gin.HandlerFunc {
 
 		if traceHeader.SamplingDecision != header.Sampled && traceHeader.SamplingDecision != header.NotSampled {
 			seg.Sampled = seg.ParentSegment.GetConfiguration().SamplingStrategy.ShouldTrace(r.Host, r.URL.Path, r.Method)
-			xlog.Tracef("SamplingStrategy decided: %t", seg.Sampled)
+			logrus.Tracef("SamplingStrategy decided: %t", seg.Sampled)
 		}
 		if traceHeader.SamplingDecision == header.Requested {
 			respHeader.WriteString(";Sampled=")
@@ -148,66 +151,77 @@ func Metrics() gin.HandlerFunc {
 		}
 
 		c.Writer.Header().Set("x-amzn-trace-id", respHeader.String())
-		seg.Unlock()
+		//seg.Unlock()
 
-		// Process request
-		c.Next()
-
-		clientIP := c.ClientIP()
-		statusCode := c.Writer.Status()
-		comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
-
-		seg.Lock()
-		seg.GetHTTP().GetResponse().Status = c.Writer.Status()
-		seg.GetHTTP().GetResponse().ContentLength, _ = strconv.Atoi(c.Writer.Header().Get("Content-Length"))
-
-		if statusCode >= 400 && statusCode < 500 {
-			seg.Error = true
-		}
-		if statusCode == 429 {
-			seg.Throttle = true
-		}
-		if statusCode >= 500 && statusCode < 600 {
-			seg.Fault = true
-		}
-		seg.Unlock()
-		seg.Close(nil)
-
-		// Stop timer
-		end := time.Now()
-		latency := end.Sub(start)
-
-		if statusCode == http.StatusNotFound {
-			c.Set(KeyRet, CodeClient404Err.Ret) //404也打日志
-		}
-		endpoint := fmt.Sprintf("%s-%s", r.URL.Path, c.Request.Method)
-		entry := logrus.WithFields(logrus.Fields{
-			"statusCode": statusCode,
-			"latency":    fmt.Sprintf("%v", latency),
-			"clientIP":   clientIP,
-			"endpoint":   endpoint,
-			"comment":    comment,
-		})
-		entry.Info()
-		if latency > 500*time.Millisecond {
-			entry.Warn("slow api")
-		}
-
-		elapsed := latency.Seconds() * 1000.0
-
-		ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
-		if ok {
-			if ret >= 4000 && ret < 5000 {
-				ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
-			} else if ret >= 5000 && ret < 6000 {
-				ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+		defer func() {
+			rec := recover()
+			if rec != nil {
+				CodeSend(c, nil, CodeServerMidPaincErr.WithErrorf("panic recover: %s", rec))
 			}
-		} else {
-			entry.Warnf("invalid ret:%+v", c.Value(KeyRet))
-		}
 
-		ResponseCounter.WithLabelValues(endpoint).Inc()
-		ResponseLatency.WithLabelValues(endpoint).Observe(elapsed)
+			clientIP := c.ClientIP()
+			statusCode := c.Writer.Status()
+			comment := c.Errors.ByType(gin.ErrorTypePrivate).String()
+
+			//seg.Lock()
+			seg.GetHTTP().GetResponse().Status = c.Writer.Status()
+			seg.GetHTTP().GetResponse().ContentLength, _ = strconv.Atoi(c.Writer.Header().Get("Content-Length"))
+
+			if statusCode >= 400 && statusCode < 500 {
+				seg.Error = true
+			}
+			if statusCode == 429 {
+				seg.Throttle = true
+			}
+			if statusCode >= 500 && statusCode < 600 {
+				seg.Fault = true
+			}
+
+			// Stop timer
+			latency := time.Now().Sub(start)
+
+			if statusCode == http.StatusNotFound {
+				c.Set(KeyRet, CodeClient404Err.Ret) //404也打日志
+			}
+			endpoint := fmt.Sprintf("%s-%s", r.URL.Path, c.Request.Method)
+			entry := logrus.WithFields(logrus.Fields{
+				"statusCode": statusCode,
+				"latency":    latency.String(),
+				"clientIP":   clientIP,
+				"endpoint":   endpoint,
+				"comment":    comment,
+			})
+
+			ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
+			if ok {
+				if ret >= 4000 && ret < 5000 {
+					ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+				} else if ret >= 5000 && ret < 6000 {
+					ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
+				}
+				entry = entry.WithField("ret", ret)
+			} else {
+				entry.Warnf("invalid ret:%+v", c.Value(KeyRet))
+			}
+
+			ResponseCounter.WithLabelValues(endpoint).Inc()
+			ResponseLatency.WithLabelValues(endpoint).Observe(latency.Seconds() * 1000.0)
+
+			entry.Info()
+			if latency > 500*time.Millisecond {
+				entry.Warn("slow api")
+			}
+			if rec != nil {
+				entry.WithFields(logrus.Fields{
+					"stack":   GetStack(3),
+					"recover": rec,
+				}).Error()
+			}
+			//seg.Unlock()
+			seg.Close(nil)
+		}()
+		// Process request
+		c.Next() //这里面可能发生panic
 	}
 }
 
@@ -224,7 +238,7 @@ func GetStack(skip int) (names []string) {
 		if s == unknown {
 			break
 		}
-		if len(s) < len(ProjectName) || s[:len(ProjectName)] != ProjectName {
+		if !pr.MatchString(s) {
 			continue
 		}
 		names = append(names, s)
@@ -245,10 +259,18 @@ func GetSource(skip int) (name string) {
 func BeginSubsegment(ctxp *context.Context) func() {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSubsegment(*ctxp, GetSource(2))
-	return func() { seg.Close(nil) }
+	return func() { CloseSeg(seg) }
 }
 func BeginSegment(ctxp *context.Context) func() {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSegment(*ctxp, GetSource(2))
-	return func() { seg.Close(nil) }
+	return func() { CloseSeg(seg) }
+}
+
+func CloseSeg(seg *xray.Segment) {
+	r := recover() //NOTE: 即使panic也要close
+	seg.Close(nil)
+	if r != nil {
+		panic(r) //NOTE： close后把panic抛出
+	}
 }
