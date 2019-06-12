@@ -139,8 +139,8 @@ github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042 h1:Bvq8AziQ5j
 github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042/go.mod h1:TPpsiPUEh0zFL1Snz4crhMlBe60PYxRHr5oFF3rRYg0=
 github.com/lib/pq v1.1.0 h1:/5u4a+KGJptBRqGzPvYQL9p0d/tPR4S31+Tnzj9lEO4=
 github.com/lib/pq v1.1.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
-github.com/lun-zhang/gorm v1.9.9 h1:xlwlfaLhK2c90hO2MfJRZYhzTr3JDH823ogNW117w48=
-github.com/lun-zhang/gorm v1.9.9/go.mod h1:ts5qeV5fxLda0eBBqKXqQNhI1wfG6WzJHmTEXdOrOyE=
+github.com/lun-zhang/gorm v1.9.10-0.20190612043747-fe707b7509b1 h1:ZpPpXKTivr9vmrA3lzLjFXBC1JbU49d0wP4OeOlUAAU=
+github.com/lun-zhang/gorm v1.9.10-0.20190612043747-fe707b7509b1/go.mod h1:ts5qeV5fxLda0eBBqKXqQNhI1wfG6WzJHmTEXdOrOyE=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-isatty v0.0.3/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-isatty v0.0.7 h1:UvyT9uN+3r7yLEYSlJsbQGdsaB/a0DlgWP3pql6iwOc=

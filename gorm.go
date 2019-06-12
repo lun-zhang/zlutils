@@ -61,8 +61,31 @@ func GetDB(my MysqlConfig) *gorm.DB {
 	return db
 }
 
+func GetDBMasterAndSlave(my MysqlConfigMasterAndSlave) *gorm.DB {
+	entry := logrus.WithField("my", my)
+	db, err := gorm.OpenMasterAndSlave("mysql", my.Master.Url, my.Slave.Url)
+	if err != nil {
+		entry.WithError(err).Fatal("mysql connect fail")
+	}
+	my.Master.setConns(db)
+	my.Slave.setConns(db)
+	db.LogMode(true).SetLogger(&DBLogger{})
+	entry.Info("mysql connect ok")
+	return db
+}
+
 type MysqlConfig struct {
 	Url          string `json:"url"`
 	MaxOpenConns int    `json:"max_open_conns"`
 	MaxIdleConns int    `json:"max_idle_conns"`
+}
+
+func (my MysqlConfig) setConns(db *gorm.DB) {
+	db.DB().SetMaxOpenConns(my.MaxOpenConns)
+	db.DB().SetMaxIdleConns(my.MaxIdleConns)
+}
+
+type MysqlConfigMasterAndSlave struct {
+	Master MysqlConfig `json:"master"`
+	Slave  MysqlConfig `json:"slave"`
 }
