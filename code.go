@@ -66,7 +66,11 @@ func CodeSend(c *gin.Context, data interface{}, err error) {
 	if code.Err != nil {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) || //NOTE: 非正式环境全部输出，方便调试
 			!RetIsServerErr(code.Ret) { //NOTE: 正式环境，禁止打印服务器错误，因为可能暴露服务器信息
-			code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+			if code.Msg == "" {
+				code.Msg = code.Err.Error()
+			} else {
+				code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+			}
 		}
 	}
 
