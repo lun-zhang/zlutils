@@ -49,6 +49,10 @@ type Result struct {
 
 const KeyRet = "_key_ret"
 
+func RetIsServerErr(ret int) bool {
+	return ret >= 5000 && ret < 6000
+}
+
 func CodeSend(c *gin.Context, data interface{}, err error) {
 	var code Code
 	if err == nil {
@@ -59,10 +63,13 @@ func CodeSend(c *gin.Context, data interface{}, err error) {
 			code = CodeServerErr.WithError(err) //NOTE: 未定义的会被认为是服务器错误，因此客户端错误一定都要定义
 		}
 	}
-
-	if logrus.IsLevelEnabled(logrus.DebugLevel) && code.Err != nil { //NOTE: err在debug模式拼接到msg上，正式环境不会输出
-		code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+	if code.Err != nil {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) || //NOTE: 非正式环境全部输出，方便调试
+			!RetIsServerErr(code.Ret) { //NOTE: 正式环境，禁止打印服务器错误，因为可能暴露服务器信息
+			code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+		}
 	}
+
 	if code.Ret != 0 {
 		data = nil //NOTE: 不是成功就不反回data
 	}
