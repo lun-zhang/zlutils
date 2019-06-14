@@ -64,7 +64,8 @@ func CodeSend(c *gin.Context, data interface{}, err error) {
 		}
 	}
 	if code.Err != nil {
-		if logrus.IsLevelEnabled(logrus.DebugLevel) || //NOTE: 非正式环境全部输出，方便调试
+		if _, ok := c.Get(KeyAdminOperator); ok || //NOTE: 管理后台请求的错误全部输出，包括服务器错误
+			logrus.IsLevelEnabled(logrus.DebugLevel) || //NOTE: 非正式环境全部输出，方便调试
 			!RetIsServerErr(code.Ret) { //NOTE: 正式环境，禁止打印服务器错误，因为可能暴露服务器信息
 			if code.Msg == "" {
 				code.Msg = code.Err.Error()
