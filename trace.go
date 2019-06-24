@@ -176,9 +176,9 @@ func Metrics() gin.HandlerFunc {
 		//seg.Unlock()
 
 		defer func() {
-			rec := recover()
+			rec := recover() //如果函数没被保护，最终会被这里捕获
 			if rec != nil {
-				CodeSend(c, nil, CodeServerMidPaincErr.WithErrorf("panic recover: %s", rec))
+				CodeSend(c, nil, CodeServerMidPaincErr.WithErrorf("panic: %+v", rec))
 			}
 
 			clientIP := c.ClientIP()
@@ -214,11 +214,12 @@ func Metrics() gin.HandlerFunc {
 				"comment":    comment,
 			})
 
-			ret, ok := c.Value(KeyRet).(int) //NOTE: 如果返回没调CodeSend就没有ret，避免panic
-			if ok {
+			if ret, ok := c.Value(KeyRet).(int); ok { //NOTE: 如果返回没调CodeSend就没有ret，避免panic
 				if ret >= 4000 && ret < 5000 {
+					seg.Error = true
 					ClientErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
 				} else if ret >= 5000 && ret < 6000 {
+					seg.Fault = true //FIXED: 让xray识别
 					ServerErrorCounter.WithLabelValues(endpoint, strconv.Itoa(ret)).Inc()
 				}
 				entry = entry.WithField("ret", ret)
@@ -278,23 +279,31 @@ func GetSource(skip int) (name string) {
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
 //没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
-func BeginSubsegment(ctxp *context.Context) func() {
+//保护函数不会panic，panic会转化成err
+func BeginSubsegment(ctxp *context.Context, errp *error) func() {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSubsegment(*ctxp, GetSource(2))
-	return func() { CloseSeg(seg) }
+	return CloseSeg(seg, errp)
 }
-func BeginSegment(ctxp *context.Context) func() {
+func BeginSegment(ctxp *context.Context, errp *error) func() {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSegment(*ctxp, GetSource(2))
-	return func() { CloseSeg(seg) }
+	return CloseSeg(seg, errp)
 }
 
-func CloseSeg(seg *xray.Segment) {
-	r := recover() //NOTE: 即使panic也要close
-	seg.Close(nil)
-	FuncCounter.WithLabelValues(seg.Name).Inc()
-	FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
-	if r != nil {
-		panic(r) //NOTE： close后把panic抛出
+func CloseSeg(seg *xray.Segment, errp *error) func() {
+	return func() {
+		if r := recover(); r != nil { //NOTE: 即使panic也要close
+			if errp != nil {
+				*errp = CodeServerMidPaincErr.WithErrorf("panic: %+v", r) //panic赋到err上，不再抛出panic
+			}
+		}
+		var err error
+		if errp != nil {
+			err = *errp
+		}
+		seg.Close(err)
+		FuncCounter.WithLabelValues(seg.Name).Inc()
+		FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
 	}
 }
