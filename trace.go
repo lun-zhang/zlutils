@@ -280,29 +280,36 @@ func GetSource(skip int) (name string) {
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
 //没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
 //保护函数不会panic，panic会转化成err
-func BeginSubsegment(ctxp *context.Context, errp *error) func() {
+
+type closeSeg func(*error)
+
+func BeginSubsegment(ctxp *context.Context) closeSeg {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSubsegment(*ctxp, GetSource(2))
-	return CloseSeg(seg, errp)
+	return CloseSeg(seg)
 }
-func BeginSegment(ctxp *context.Context, errp *error) func() {
+func BeginSegment(ctxp *context.Context) closeSeg {
 	var seg *xray.Segment
 	*ctxp, seg = xray.BeginSegment(*ctxp, GetSource(2))
-	return CloseSeg(seg, errp)
+	return CloseSeg(seg)
 }
 
-func CloseSeg(seg *xray.Segment, errp *error) func() {
-	return func() {
+//目前panic和*errp!=nil顶多发生一个
+func CloseSeg(seg *xray.Segment) closeSeg {
+	return func(errp *error) {
+		var err error
 		if r := recover(); r != nil { //NOTE: 即使panic也要close
+			err = CodeServerMidPaincErr.WithErrorf("panic: %+v", r) //recover赋到*errp上，不再抛出panic
 			if errp != nil {
-				*errp = CodeServerMidPaincErr.WithErrorf("panic: %+v", r) //panic赋到err上，不再抛出panic
+				*errp = err
+			}
+		} else {
+			if errp != nil {
+				err = *errp
 			}
 		}
-		var err error
-		if errp != nil {
-			err = *errp
-		}
-		seg.Close(err)
+
+		seg.Close(err) //如果panic，这里可以记录到
 		FuncCounter.WithLabelValues(seg.Name).Inc()
 		FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
 	}
