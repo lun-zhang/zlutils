@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/header"
+	"github.com/aws/aws-xray-sdk-go/strategy/sampling"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,11 +40,10 @@ var (
 	//写日志很快所以没有计时
 
 	sn *xray.FixedSegmentNamer
+	pr *regexp.Regexp
 )
 
-var pr *regexp.Regexp
-
-func InitTrace() {
+func InitTrace(args ...interface{}) {
 	pr = regexp.MustCompile(ProjectName)
 	ResponseCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -114,8 +114,6 @@ func InitTrace() {
 		[]string{"level"},
 	)
 
-	sn = xray.NewFixedSegmentNamer(ProjectName)
-
 	prometheus.MustRegister(
 		ResponseCounter,
 		ServerErrorCounter,
@@ -128,11 +126,38 @@ func InitTrace() {
 		LogCounter,
 	)
 
-	xray.Configure(xray.Config{
-		DaemonAddr:     "127.0.0.1:3000",
-		LogLevel:       "info",
-		ServiceVersion: "1.0.0",
-	})
+	var sample []byte
+	if len(args) >= 1 {
+		if s, ok := args[0].([]byte); ok {
+			sample = s
+		}
+	}
+	initXRay(sample)
+}
+
+func initXRay(sample []byte) {
+	if sample == nil {
+		sample = []byte(`{
+  "version": 1,
+  "default": {
+    "fixed_target": 1,
+    "rate": 0.05
+  }
+}`)
+	}
+	ss, err := sampling.NewLocalizedStrategyFromJSONBytes(sample)
+	if err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	if err = xray.Configure(xray.Config{
+		DaemonAddr:       "127.0.0.1:3000",
+		LogLevel:         "info",
+		ServiceVersion:   "1.0.0",
+		SamplingStrategy: ss,
+	}); err != nil {
+		logrus.WithError(err).Fatal()
+	}
+	sn = xray.NewFixedSegmentNamer(ProjectName)
 }
 
 //不需要skip，不需要的接口不用此中间件即可
