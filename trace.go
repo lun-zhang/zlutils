@@ -43,7 +43,7 @@ var (
 	pr *regexp.Regexp
 )
 
-func InitTrace(args ...interface{}) {
+func InitTrace() {
 	pr = regexp.MustCompile(ProjectName)
 	ResponseCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -125,17 +125,9 @@ func InitTrace(args ...interface{}) {
 		FuncLatency,
 		LogCounter,
 	)
-
-	var sample []byte
-	if len(args) >= 1 {
-		if s, ok := args[0].([]byte); ok {
-			sample = s
-		}
-	}
-	initXRay(sample)
 }
 
-func initXRay(sample []byte) {
+func InitXRay(sample []byte) {
 	if sample == nil {
 		sample = []byte(`{
   "version": 1,
