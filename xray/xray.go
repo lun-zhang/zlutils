@@ -2,6 +2,7 @@ package xray
 
 import (
 	"bytes"
+	"context"
 	"github.com/aws/aws-xray-sdk-go/header"
 	"github.com/aws/aws-xray-sdk-go/strategy/sampling"
 	"github.com/aws/aws-xray-sdk-go/xray"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"zlutils/caller"
 )
 
 //用于填充xray的中间件
@@ -83,20 +85,15 @@ func Mid(projectName string, sample []byte,
 		seg.GetHTTP().GetResponse().Status = c.Writer.Status()
 		seg.GetHTTP().GetResponse().ContentLength, _ = strconv.Atoi(c.Writer.Header().Get("Content-Length"))
 
-		if statusCode >= 400 && statusCode < 500 {
+		if statusCode >= 400 && statusCode < 500 ||
+			isClientErr != nil && isClientErr(c) {
 			seg.Error = true
 		}
 		if statusCode == 429 {
 			seg.Throttle = true
 		}
-		if statusCode >= 500 && statusCode < 600 {
-			seg.Fault = true
-		}
-		//这里是使用者自定义的返回码的判断
-		if isClientErr != nil && isClientErr(c) {
-			seg.Error = true
-		}
-		if isServerErr != nil && isServerErr(c) {
+		if statusCode >= 500 && statusCode < 600 ||
+			isServerErr != nil && isServerErr(c) {
 			seg.Fault = true
 		}
 		//seg.Unlock()
@@ -121,4 +118,40 @@ func clientIP(r *http.Request) (string, bool) {
 		return r.RemoteAddr, false
 	}
 	return ip, false
+}
+
+//凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
+//没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
+//保护函数不会panic，panic会转化成err
+type closeSeg func(*error)
+
+func BeginSubsegment(ctxp *context.Context) closeSeg {
+	var seg *xray.Segment
+	*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(2))
+	return CloseSeg(seg)
+}
+func BeginSegment(ctxp *context.Context) closeSeg {
+	var seg *xray.Segment
+	*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(2))
+	return CloseSeg(seg)
+}
+
+//目前panic和*errp!=nil顶多发生一个
+func CloseSeg(seg *xray.Segment) closeSeg {
+	return func(errp *error) {
+		var err error
+		if r := recover(); r != nil { //NOTE: 即使panic也要close
+			//err = code.ServerErrPainc.WithErrorf("panic: %+v", r) //recover赋到*errp上，不再抛出panic
+			if errp != nil {
+				*errp = err
+			}
+		} else {
+			if errp != nil {
+				err = *errp
+			}
+		}
+		seg.Close(err) //如果panic，这里可以记录到
+		//FuncCounter.WithLabelValues(seg.Name).Inc()
+		//FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
+	}
 }
