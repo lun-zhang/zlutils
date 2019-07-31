@@ -8,6 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.4.0
 	github.com/go-playground/validator v9.29.0+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/gosexy/to v0.0.0-20141221203644-c20e083e3123
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042 // indirect
