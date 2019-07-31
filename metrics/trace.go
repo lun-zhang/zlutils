@@ -21,8 +21,7 @@ import (
 var (
 	ProjectName string
 
-	historyBuckets = []float64{
-		10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
+	historyBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
 	ResponseCounter *prometheus.CounterVec   //请求次数
 	ResponseLatency *prometheus.HistogramVec //请求耗时，用于alert
@@ -40,11 +39,11 @@ var (
 	//写日志很快所以没有计时
 
 	sn *xray.FixedSegmentNamer
-	pr *regexp.Regexp
+
 )
 
 func InitTrace() {
-	pr = regexp.MustCompile(ProjectName)
+
 	ResponseCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_requests_total", ProjectName),
@@ -270,29 +269,6 @@ func GetMetrics(c *gin.Context) {
 	handler.ServeHTTP(c.Writer, c.Request)
 }
 
-const unknown = "unknown"
-
-func GetStack(skip int) (names []string) {
-	for i := skip; ; i++ {
-		s := GetSource(i)
-		if s == unknown {
-			break
-		}
-		if !pr.MatchString(s) {
-			continue
-		}
-		names = append(names, s)
-	}
-	return
-}
-
-func GetSource(skip int) (name string) {
-	name = unknown
-	if pc, _, line, ok := runtime.Caller(skip); ok {
-		name = fmt.Sprintf("%s:%d", runtime.FuncForPC(pc).Name(), line)
-	}
-	return
-}
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
 //没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
