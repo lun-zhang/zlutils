@@ -1,4 +1,4 @@
-package zlutils
+package db
 
 import (
 	"github.com/sirupsen/logrus"

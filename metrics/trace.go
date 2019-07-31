@@ -1,4 +1,4 @@
-package zlutils
+package metrics
 
 import (
 	"bytes"
@@ -21,7 +21,7 @@ import (
 var (
 	ProjectName string
 
-	historyBuckets = [...]float64{
+	historyBuckets = []float64{
 		10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
 	ResponseCounter *prometheus.CounterVec   //请求次数
@@ -70,7 +70,7 @@ func InitTrace() {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_response_latency_millisecond", ProjectName),
 			Help:    "Response latency (millisecond)",
-			Buckets: historyBuckets[:],
+			Buckets: historyBuckets,
 		},
 		[]string{"endpoint"},
 	)
@@ -85,7 +85,7 @@ func InitTrace() {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_mysql_latency_millisecond", ProjectName),
 			Help:    "Mysql latency (millisecond)",
-			Buckets: historyBuckets[:],
+			Buckets: historyBuckets,
 		},
 		[]string{"query"},
 	)
@@ -101,7 +101,7 @@ func InitTrace() {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_func_latency_millisecond", ProjectName),
 			Help:    "Func latency (millisecond)",
-			Buckets: historyBuckets[:],
+			Buckets: historyBuckets,
 		},
 		[]string{"func"},
 	)

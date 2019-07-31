@@ -1,14 +1,13 @@
-package zlutils
+package mid
 
 import (
 	"bytes"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/redis.v5"
 	"io/ioutil"
 	"strconv"
-	"time"
+	"zlutils/code"
 )
 
 type AdminOperator struct {
@@ -23,8 +22,8 @@ const (
 )
 
 func MidAdminOperator() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		operator, err := func(c *gin.Context) (operator AdminOperator, err error) {
+	return code.Wrap(func(c *code.Context) {
+		operator, err := func(c *code.Context) (operator AdminOperator, err error) {
 			if err = c.ShouldBindQuery(&operator); err != nil {
 				return
 			}
@@ -37,12 +36,12 @@ func MidAdminOperator() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			CodeSend(c, nil, CodeClientQueryParamsErr.WithError(fmt.Errorf("invalid operator, err:%s", err.Error())))
+			c.Send(nil, code.ClientErrQuery.WithError(fmt.Errorf("invalid operator, err:%s", err.Error())))
 			c.Abort()
 			return
 		}
 		c.Set(KeyAdminOperator, operator)
-	}
+	})
 }
 
 type User struct {
@@ -69,8 +68,8 @@ const (
 
 //FIXME 感觉这个不是公用的，不改放这里
 func MidUser() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		user, err := func(c *gin.Context) (user User, err error) {
+	return code.Wrap(func(c *code.Context) {
+		user, err := func(c *code.Context) (user User, err error) {
 			header := c.Request.Header
 			user = User{
 				//FIXME 从token中获得用户信息，兼容新token
@@ -103,12 +102,12 @@ func MidUser() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			CodeSend(c, nil, CodeClientHeaderParamsErr.WithError(fmt.Errorf("invalid user, %s", err.Error())))
+			c.Send(nil, code.ClientErrHeader.WithError(fmt.Errorf("invalid user, %s", err.Error())))
 			c.Abort()
 			return
 		}
 		c.Set(KeyUser, user)
-	}
+	})
 }
 
 //NOTE: 如果想要上线后(level=info)想要某些接口打印日志，则增加一个类似于LogInfoWriter的struct
@@ -142,41 +141,5 @@ func MidLogReqResp() gin.HandlerFunc {
 		c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
 		c.Writer = LogDebugWriter{c.Writer}
 		c.Next()
-	}
-}
-
-//限制同一个人不可并发
-// 如果多个接口都用这个中间件，则接口之间也不能并发
-func MidLockUser(reConn *redis.Client, expiration time.Duration) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		user := GetUser(c)
-		key := fmt.Sprintf("%s:lock:%d:%s", ProjectName, user.ProductId, user.UserIdentity)
-		cmdL := reConn.SetNX(key, nil, expiration)
-		ok, err := cmdL.Result()
-		entry := logrus.WithFields(logrus.Fields{
-			"redis-cmdL": cmdL.String(),
-			"user":       user,
-		})
-		if err != nil {
-			entry.WithError(err).Error()
-			CodeSend(c, nil, CodeServerMidRedisErr.WithError(err))
-			c.Abort()
-			return
-		}
-		if !ok {
-			entry.Warn("forbid concurrent")
-			CodeSend(c, nil, CodeClientForbidConcurrentErr)
-			c.Abort()
-			return
-		}
-		c.Next()
-		cmdU := reConn.Del(key)
-		entry = entry.WithField("redis-cmdU", cmdU.String())
-		if err = cmdU.Err(); err != nil {
-			entry.WithError(err).Error()
-			CodeSend(c, nil, CodeServerMidRedisErr.WithError(err))
-			c.Abort()
-			return
-		}
 	}
 }
