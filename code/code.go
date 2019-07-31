@@ -48,8 +48,11 @@ type Result struct {
 
 const KeyRet = "_key_ret"
 
-func (code Code) IsServerErr(ret int) bool {
+func IsServerErr(ret int) bool {
 	return ret >= 5000 && ret < 6000
+}
+func IsClientErr(ret int) bool {
+	return ret >= 4000 && ret < 5000
 }
 
 type Context struct {
@@ -63,6 +66,35 @@ func Wrap(f HandelFunc) gin.HandlerFunc {
 		f(&Context{c})
 	}
 }
+
+func GetRet(c *gin.Context) (int, bool) {
+	if v, ok := c.Get(KeyRet); ok {
+		if ret, ok := v.(int); ok {
+			return ret, ok
+		}
+	}
+	return 0, false
+}
+
+func RespIsServerErr(c *gin.Context) bool {
+	if ret, ok := GetRet(c); ok {
+		return IsServerErr(ret)
+	}
+	return false
+}
+
+func RespIsClientErr(c *gin.Context) bool {
+	if ret, ok := GetRet(c); ok {
+		return IsClientErr(ret)
+	}
+	return false
+}
+
+//if ret >= 4000 && ret < 5000 {
+//
+//} else if ret >= 5000 && ret < 6000 {
+//
+//}
 
 func (c *Context) Send(data interface{}, err error) {
 	var code Code

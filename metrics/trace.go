@@ -5,15 +5,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/header"
-	"github.com/aws/aws-xray-sdk-go/strategy/sampling"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"regexp"
-	"runtime"
 	"strconv"
 	"time"
 )
@@ -37,9 +34,6 @@ var (
 
 	LogCounter *prometheus.CounterVec //log次数
 	//写日志很快所以没有计时
-
-	sn *xray.FixedSegmentNamer
-
 )
 
 func InitTrace() {
@@ -124,31 +118,6 @@ func InitTrace() {
 		FuncLatency,
 		LogCounter,
 	)
-}
-
-func InitXRay(sample []byte) {
-	if sample == nil {
-		sample = []byte(`{
-  "version": 1,
-  "default": {
-    "fixed_target": 1,
-    "rate": 0.05
-  }
-}`)
-	}
-	ss, err := sampling.NewLocalizedStrategyFromJSONBytes(sample)
-	if err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	if err = xray.Configure(xray.Config{
-		DaemonAddr:       "127.0.0.1:3000",
-		LogLevel:         "info",
-		ServiceVersion:   "1.0.0",
-		SamplingStrategy: ss,
-	}); err != nil {
-		logrus.WithError(err).Fatal()
-	}
-	sn = xray.NewFixedSegmentNamer(ProjectName)
 }
 
 //不需要skip，不需要的接口不用此中间件即可
@@ -268,7 +237,6 @@ func GetMetrics(c *gin.Context) {
 	handler := promhttp.Handler()
 	handler.ServeHTTP(c.Writer, c.Request)
 }
-
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
 //没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次

@@ -25,3 +25,17 @@ func TestT(t *testing.T) {
 	endless.ListenAndServe(":11111", router)
 	os.Exit(0)
 }
+
+func TestRespIsErr(t *testing.T) {
+	c := &gin.Context{}
+	fmt.Println(RespIsClientErr(c))
+	fmt.Println(RespIsServerErr(c))
+
+	c.Set(KeyRet, ClientErr.Ret)
+	fmt.Println(RespIsClientErr(c))
+	fmt.Println(RespIsServerErr(c))
+
+	c.Set(KeyRet, ServerErr.Ret)
+	fmt.Println(RespIsClientErr(c))
+	fmt.Println(RespIsServerErr(c))
+}
