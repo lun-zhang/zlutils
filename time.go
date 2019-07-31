@@ -7,14 +7,12 @@ import (
 	"time"
 )
 
-type JsonTime time.Time //NOTE: 让数据库能使用该类型，但是存数据库时候不会存成json
-
-//方便打印
-func (t JsonTime) String() string {
-	return time.Time(t).String()
+//NOTE: 让数据库能使用该类型，但是存数据库时候不会存成json
+type Time struct {
+	time.Time
 }
 
-func (t *JsonTime) UnmarshalJSON(b []byte) error {
+func (t *Time) UnmarshalJSON(b []byte) error {
 	s := string(b)
 	if s == "null" {
 		//NOTE: 依照官方做法no-op
@@ -26,24 +24,24 @@ func (t *JsonTime) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	*t = JsonTime(time.Unix(i, 0))
+	t.Time = time.Unix(i, 0)
 	return nil
 }
 
-func (t JsonTime) MarshalJSON() ([]byte, error) {
-	return []byte(strconv.FormatInt(time.Time(t).Unix(), 10)), nil
+func (t Time) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.FormatInt(t.Unix(), 10)), nil
 }
 
-func (t JsonTime) Value() (driver.Value, error) {
-	return time.Time(t), nil
+func (t Time) Value() (driver.Value, error) {
+	return t.Time, nil
 }
 
-func (t *JsonTime) Scan(src interface{}) error {
+func (t *Time) Scan(src interface{}) error {
 	tmp, ok := src.(time.Time)
 	if !ok {
-		return fmt.Errorf("JsonTime src must be time.Time")
+		return fmt.Errorf("src must be time.Time")
 	}
-	*t = JsonTime(tmp)
+	t.Time = tmp
 	return nil
 }
 
