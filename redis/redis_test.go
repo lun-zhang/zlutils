@@ -10,7 +10,7 @@ import (
 
 func TestClient_GetJson(t *testing.T) {
 	log.Init(log.Config{Level: logrus.DebugLevel})
-	client := Init("redis://localhost:6379")
+	client := New("redis://localhost:6379")
 	type C struct {
 		D bool
 	}
@@ -39,7 +39,7 @@ func TestClient_GetJson(t *testing.T) {
 
 func TestClient_MGetJsonMap(t *testing.T) {
 	log.Init(log.Config{Level: logrus.DebugLevel})
-	client := Init("redis://localhost:6379")
+	client := New("redis://localhost:6379")
 	if err := client.MultiSetJson(map[string]interface{}{
 		"b": 1,
 		"c": "b",

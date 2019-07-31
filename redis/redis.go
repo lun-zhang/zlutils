@@ -12,7 +12,7 @@ import (
 
 //NOTE: 只能用于初始化时候，失败则fatal
 //redis基本不会是性能瓶颈，所以不放xray
-func Init(url string) (client *Client) {
+func New(url string) (client *Client) {
 	redisOpt, err := redis.ParseURL(url)
 	if err != nil {
 		logrus.WithError(err).Fatalf("redis connect failed")
