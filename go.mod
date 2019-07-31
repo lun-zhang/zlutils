@@ -15,5 +15,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
 	gopkg.in/redis.v5 v5.2.9
-	xlbj-gitlab.xunlei.cn/oversea/zlutils v5.1.0+incompatible
+	zlutils v0.0.0
 )
+
+replace zlutils v0.0.0 => ../zlutils
