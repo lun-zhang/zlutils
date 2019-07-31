@@ -6,12 +6,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"testing"
 	"zlutils/caller"
-	"zlutils/log"
+	"zlutils/logger"
 )
 
 func TestGorm(t *testing.T) {
 	caller.Init("zlutils")
-	log.Init(log.Config{Level: logrus.DebugLevel})
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	db := NewDB(Config{
 		Url: "root:123@/counter?charset=utf8&parseTime=True&loc=Local",
 	})

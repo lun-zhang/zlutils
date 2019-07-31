@@ -5,11 +5,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"testing"
 	"time"
-	"zlutils/log"
+	"zlutils/logger"
 )
 
 func TestClient_GetJson(t *testing.T) {
-	log.Init(log.Config{Level: logrus.DebugLevel})
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	client := New("redis://localhost:6379")
 	type C struct {
 		D bool
@@ -38,7 +38,7 @@ func TestClient_GetJson(t *testing.T) {
 }
 
 func TestClient_MGetJsonMap(t *testing.T) {
-	log.Init(log.Config{Level: logrus.DebugLevel})
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	client := New("redis://localhost:6379")
 	if err := client.MultiSetJson(map[string]interface{}{
 		"b": 1,

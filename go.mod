@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
+	github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042 // indirect
 	github.com/lun-zhang/gorm v1.9.10-0.20190627121314-6f8ca1642773
 	github.com/prometheus/client_golang v0.9.3
 	github.com/sirupsen/logrus v1.4.2
