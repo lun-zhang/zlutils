@@ -90,12 +90,6 @@ func RespIsClientErr(c *gin.Context) bool {
 	return false
 }
 
-//if ret >= 4000 && ret < 5000 {
-//
-//} else if ret >= 5000 && ret < 6000 {
-//
-//}
-
 func (c *Context) Send(data interface{}, err error) {
 	var code Code
 	if err == nil {
