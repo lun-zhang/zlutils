@@ -3,6 +3,7 @@ package xray
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/aws/aws-xray-sdk-go/header"
 	"github.com/aws/aws-xray-sdk-go/strategy/sampling"
 	"github.com/aws/aws-xray-sdk-go/xray"
@@ -141,6 +142,7 @@ func CloseSeg(seg *xray.Segment) closeSeg {
 	return func(errp *error) {
 		var err error
 		if r := recover(); r != nil { //NOTE: 即使panic也要close
+			err = fmt.Errorf("panic: %+v", r)
 			//err = code.ServerErrPainc.WithErrorf("panic: %+v", r) //recover赋到*errp上，不再抛出panic
 			if errp != nil {
 				*errp = err
