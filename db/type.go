@@ -1,4 +1,4 @@
-package zlutils
+package db
 
 import (
 	"database/sql"
@@ -26,14 +26,14 @@ func IsPtrNil(i interface{}) (ok bool) {
 	return reflect.ValueOf(i).IsNil() //TODO 非指针类型会panic，所以recover并返回false，是否有更好的做法？
 }
 
-func JCValue(i interface{}) (driver.Value, error) {
+func Value(i interface{}) (driver.Value, error) {
 	if IsPtrNil(i) { //NOTE: 如果是nil则插入到数据库NULL
 		return nil, nil
 	}
 	return json.Marshal(i) //struct类型不会为nil，即使是零值也会插入到数据库
 }
 
-func JCScan(dest, src interface{}) (err error) {
+func Scan(dest, src interface{}) (err error) {
 	if err = SetZero(dest); err != nil {
 		return
 	}
@@ -47,29 +47,29 @@ func JCScan(dest, src interface{}) (err error) {
 	return json.Unmarshal(bs, dest)
 }
 
-//json列，与数据库的[]byte转换，实现该接口的类型应统一以JC
+//json列，与数据库的[]byte转换
 type JsonColumn interface {
 	driver.Valuer
 	sql.Scanner
 }
 
 type (
-	StringSliceJC     []string
-	MapStringStringJC map[string]string
+	SS  []string
+	MSS map[string]string
 )
 
-func (j StringSliceJC) Value() (driver.Value, error) {
-	return JCValue(j)
+func (j SS) Value() (driver.Value, error) {
+	return Value(j)
 }
 
-func (j *StringSliceJC) Scan(src interface{}) error {
-	return JCScan(j, src)
+func (j *SS) Scan(src interface{}) error {
+	return Scan(j, src)
 }
 
-func (j MapStringStringJC) Value() (driver.Value, error) {
-	return JCValue(j)
+func (j MSS) Value() (driver.Value, error) {
+	return Value(j)
 }
 
-func (j *MapStringStringJC) Scan(src interface{}) error {
-	return JCScan(j, src)
+func (j *MSS) Scan(src interface{}) error {
+	return Scan(j, src)
 }
