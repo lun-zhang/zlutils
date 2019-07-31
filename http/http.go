@@ -23,7 +23,7 @@ type MSI map[string]interface{}
 type RequestConfig struct {
 	Method       string        `json:"method"`
 	Url          string        `json:"url"`
-	ClientConfig *ClientConfig `json:"client"`
+	ClientConfig *ClientConfig `json:"client_config"`
 }
 
 type ClientConfig struct {
