@@ -1,4 +1,4 @@
-package zlutils
+package log
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"zlutils/caller"
 )
 
 type MyFormatter struct {
@@ -16,10 +17,10 @@ type MyFormatter struct {
 }
 
 func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
-	LogCounter.WithLabelValues(e.Level.String()).Inc()
+	//LogCounter.WithLabelValues(e.Level.String()).Inc()
 	if e.Level != logrus.InfoLevel {
 		if stack, ok := e.Data["stack"]; !ok {
-			e.Data["stack"] = GetStack(3) //允许外部记录stack，而不覆盖
+			e.Data["stack"] = caller.Stack(3) //允许外部记录stack，而不覆盖
 		} else if stack == nil {
 			delete(e.Data, "stack") //如果被置为nil则不输出
 		}
@@ -30,7 +31,9 @@ func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 	if err != nil {
 		return
 	}
-	err = f.write(e.Level, serialized)
+	if f.WriterMap != nil {
+		err = f.write(e.Level, serialized)
+	} //else输出到屏幕
 	return
 }
 
@@ -57,10 +60,9 @@ func (f MyFormatter) write(level logrus.Level, serialized []byte) (err error) {
 }
 
 func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
-	dir := fmt.Sprintf("/data/logs/%s", ProjectName)
-	path := fmt.Sprintf("%s/%s.log", dir, level)
-	if _, err := os.Stat(dir); err != nil || os.IsNotExist(err) {
-		panic(fmt.Errorf("not exist dir %s", dir))
+	path := fmt.Sprintf("%s/%s.log", output.Dir, level)
+	if _, err := os.Stat(output.Dir); err != nil || os.IsNotExist(err) {
+		panic(fmt.Errorf("not exist dir %s", output.Dir))
 	}
 	writer, err := rotatelogs.New(
 		path+".%Y%m%d",
@@ -71,8 +73,8 @@ func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
 		//每天分割
 		rotatelogs.WithRotationTime(time.Hour*24), //默认24h
 		//最多3个文件，配合每天分割文件，则是每3天删除旧日志
-		rotatelogs.WithMaxAge(-1),       //默认7*24h，配合次数时需显式设为-1关闭
-		rotatelogs.WithRotationCount(3), //默认-1
+		rotatelogs.WithMaxAge(-1),                          //默认7*24h，配合次数时需显式设为-1关闭
+		rotatelogs.WithRotationCount(output.RotationCount), //默认-1
 	)
 	if err != nil {
 		panic(err)
@@ -80,21 +82,35 @@ func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
 	return writer
 }
 
-func InitLog(release bool) {
-	if !release {
-		logrus.SetLevel(logrus.DebugLevel) //默认info
-	}
+type Config struct {
+	Level  logrus.Level `json:"level"`
+	Output *Output      `json:"output"`
+}
+type Output struct { //如果nil则输出到屏幕
+	Dir           string `json:"dir"`
+	RotationCount int    `json:"rotation_count"`
+}
 
-	errorWriter := getLogWriter(logrus.ErrorLevel)
-	logrus.SetFormatter(MyFormatter{
-		WriterMap: map[logrus.Level]io.Writer{
-			logrus.FatalLevel: errorWriter,
-			logrus.PanicLevel: errorWriter,
-			logrus.ErrorLevel: errorWriter,
-			logrus.WarnLevel:  getLogWriter(logrus.WarnLevel),
-			logrus.InfoLevel:  getLogWriter(logrus.InfoLevel),
-			logrus.DebugLevel: getLogWriter(logrus.DebugLevel),
-		},
-	})
-	logrus.SetOutput(ioutil.Discard)
+var output Output
+
+func Init(config Config) {
+	logrus.SetLevel(config.Level)
+	if config.Output != nil {
+		output = *config.Output
+		errorWriter := getLogWriter(logrus.ErrorLevel)
+		logrus.SetFormatter(MyFormatter{
+			WriterMap: map[logrus.Level]io.Writer{
+				logrus.FatalLevel: errorWriter,
+				logrus.PanicLevel: errorWriter,
+				logrus.ErrorLevel: errorWriter,
+				logrus.WarnLevel:  getLogWriter(logrus.WarnLevel),
+				logrus.InfoLevel:  getLogWriter(logrus.InfoLevel),
+				logrus.DebugLevel: getLogWriter(logrus.DebugLevel),
+			},
+		})
+		logrus.SetOutput(ioutil.Discard)
+	} else {
+		logrus.SetFormatter(MyFormatter{})
+		logrus.SetOutput(os.Stdout)
+	}
 }
