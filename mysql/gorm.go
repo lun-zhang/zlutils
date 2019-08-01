@@ -28,9 +28,9 @@ func (l Logger) Print(values ...interface{}) {
 		sql := gorm.PrintSQL(query, values[4].([]interface{})...)
 
 		entry = entry.WithFields(logrus.Fields{
-			"sql":                       sql,
-			"rows affected or returned": values[5],
-			"duration":                  duration.String(),
+			"sql":      sql,
+			"rows":     values[5], //rows affected or returned
+			"duration": duration.String(),
 		})
 		if duration >= 200*time.Millisecond {
 			entry.Warn("slow sql") //慢查询警告
