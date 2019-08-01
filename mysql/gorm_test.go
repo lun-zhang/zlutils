@@ -1,4 +1,4 @@
-package db
+package mysql
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 func TestGorm(t *testing.T) {
 	caller.Init("zlutils")
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
-	db := NewDB(Config{
+	db := New(Config{
 		Url: "root:123@/counter?charset=utf8&parseTime=True&loc=Local",
 	})
 	var cs Counter

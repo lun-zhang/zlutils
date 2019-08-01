@@ -1,4 +1,4 @@
-package db
+package mysql
 
 import (
 	"github.com/sirupsen/logrus"
@@ -46,7 +46,7 @@ func (l Logger) Print(values ...interface{}) {
 }
 
 //NOTE 只能用于初始化，失败则fatal
-func NewDB(config Config) *gorm.DB {
+func New(config Config) *gorm.DB {
 	entry := logrus.WithField("config", config)
 	db, err := gorm.Open("mysql", config.Url)
 	if err != nil {
@@ -59,7 +59,7 @@ func NewDB(config Config) *gorm.DB {
 	return db
 }
 
-func NewDBMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
+func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	entry := logrus.WithField("config", config)
 	db, err := gorm.OpenMasterAndSlave("mysql", config.Master.Url, config.Slave.Url)
 	if err != nil {
