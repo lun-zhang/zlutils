@@ -1,12 +1,14 @@
-package http
+package request
 
 import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/xray"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
+	"zlutils/logger"
 	zt "zlutils/time"
 )
 
@@ -14,20 +16,21 @@ var ctx context.Context
 
 func init() {
 	ctx, _ = xray.BeginSegment(context.Background(), "init")
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 }
 
 var (
-	addConfig = RequestConfig{
+	addConfig = Config{
 		Method: http.MethodPost,
 		Url:    "http://localhost:9998/counter/add",
-		ClientConfig: &ClientConfig{
+		Client: &ClientConfig{
 			Timeout: zt.Duration{
 				Duration: time.Second,
 			},
 		},
 	}
 
-	listConfig = RequestConfig{
+	listConfig = Config{
 		Method: http.MethodGet,
 		Url:    "http://localhost:9998/counter/list?behavior_type=like&is=-3",
 	}
@@ -35,7 +38,7 @@ var (
 
 func TestReqPost(t *testing.T) {
 	req := Request{
-		RequestConfig: addConfig,
+		Config: addConfig,
 		Body: MSI{
 			"like": []int64{1},
 		},
@@ -53,7 +56,7 @@ func TestReqPost(t *testing.T) {
 
 func TestReqGet(t *testing.T) {
 	req := Request{
-		RequestConfig: listConfig,
+		Config: listConfig,
 		Body: MSI{
 			"pub_id": 1,
 		},

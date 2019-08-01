@@ -1,4 +1,4 @@
-package http
+package request
 
 import (
 	"bytes"
@@ -20,10 +20,10 @@ import (
 type MSI map[string]interface{}
 
 //用于consul配置
-type RequestConfig struct {
-	Method       string        `json:"method"`
-	Url          string        `json:"url"`
-	ClientConfig *ClientConfig `json:"client_config"`
+type Config struct {
+	Method string        `json:"method"`
+	Url    string        `json:"url"`
+	Client *ClientConfig `json:"client"`
 }
 
 type ClientConfig struct {
@@ -58,7 +58,7 @@ func (m ClientConfig) GetClient() *http.Client {
 }
 
 type Request struct {
-	RequestConfig
+	Config
 	Query  MSI        //用于一次性设置
 	query  url.Values //用于循环设置
 	Header MSI
@@ -170,8 +170,8 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 		"request_header": request.Header,
 	})
 	client := defaultClient
-	if m.ClientConfig != nil {
-		client = m.ClientConfig.GetClient()
+	if m.Client != nil {
+		client = m.Client.GetClient()
 	}
 	resp, err := ctxhttp.Do(ctx, xray.Client(client), request)
 	if err != nil { //超时
