@@ -3,10 +3,11 @@ package consul
 import (
 	"fmt"
 	"testing"
+	"zlutils/time"
 )
 
 type Tmp struct {
-	D Duration `json:"d"`
+	D time.Duration `json:"d"`
 }
 
 func TestWatchJson(t *testing.T) {

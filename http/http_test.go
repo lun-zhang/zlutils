@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"zlutils/consul"
+	zt "zlutils/time"
 )
 
 var ctx context.Context
@@ -21,7 +21,7 @@ var (
 		Method: http.MethodPost,
 		Url:    "http://localhost:9998/counter/add",
 		ClientConfig: &ClientConfig{
-			Timeout: consul.Duration{
+			Timeout: zt.Duration{
 				Duration: time.Second,
 			},
 		},

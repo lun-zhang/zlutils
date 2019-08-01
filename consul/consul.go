@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/consul/api/watch"
 	"github.com/sirupsen/logrus"
 	"reflect"
-	"time"
 )
 
 var (
@@ -27,15 +26,6 @@ func GetValue(key string) (value []byte) {
 		logrus.WithError(err).WithField("key", key).Fatal()
 	}
 	return pair.Value
-}
-
-type Duration struct {
-	time.Duration
-}
-
-func (d *Duration) UnmarshalText(text []byte) (err error) {
-	d.Duration, err = time.ParseDuration(string(text))
-	return
 }
 
 func GetJson(key string, i interface{}) {

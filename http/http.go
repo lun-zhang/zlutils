@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	"zlutils/consul"
+	zt "zlutils/time"
 )
 
 type MSI map[string]interface{}
@@ -27,14 +27,14 @@ type RequestConfig struct {
 }
 
 type ClientConfig struct {
-	Timeout   consul.Duration `json:"timeout"`
+	Timeout   zt.Duration `json:"timeout"`
 	Transport struct {
-		MaxIdleConns        int             `json:"max_idle_conns"`
-		MaxIdleConnsPerHost int             `json:"max_idle_conns_per_host"`
-		IdleConnTimeout     consul.Duration `json:"idle_conn_timeout"`
+		MaxIdleConns        int         `json:"max_idle_conns"`
+		MaxIdleConnsPerHost int         `json:"max_idle_conns_per_host"`
+		IdleConnTimeout     zt.Duration `json:"idle_conn_timeout"`
 		Dialer              struct {
-			Timeout   consul.Duration `json:"timeout"`
-			KeepAlive consul.Duration `json:"keep_alive"`
+			Timeout   zt.Duration `json:"timeout"`
+			KeepAlive zt.Duration `json:"keep_alive"`
 		} `json:"dialer"`
 	} `json:"transport"`
 }

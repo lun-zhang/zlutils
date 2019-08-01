@@ -1,4 +1,4 @@
-package zlutils
+package time
 
 import (
 	"encoding/json"
@@ -20,4 +20,16 @@ func TestTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println(b)
+}
+
+func TestDuration(t *testing.T) {
+	var d Duration
+	if err := json.Unmarshal([]byte(`"1h1m1s1ms1us1ns"`), &d); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(d)
+}
+
+func TestGetIndianZeroUTC(t *testing.T) {
+	fmt.Println(GetIndianZeroUTC(time.Now()))
 }

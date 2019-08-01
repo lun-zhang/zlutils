@@ -1,4 +1,4 @@
-package zlutils
+package time
 
 import (
 	"database/sql/driver"
@@ -52,4 +52,13 @@ func GetIndianZeroUTC(t time.Time) time.Time {
 		t1830 = t1830.Add(-24 * time.Hour)
 	}
 	return t1830
+}
+
+type Duration struct {
+	time.Duration
+}
+
+func (d *Duration) UnmarshalText(text []byte) (err error) {
+	d.Duration, err = time.ParseDuration(string(text))
+	return
 }
