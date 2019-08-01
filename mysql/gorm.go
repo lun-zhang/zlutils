@@ -1,10 +1,10 @@
 package mysql
 
 import (
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
 	"time"
-
-	"github.com/lun-zhang/gorm"
 )
 
 type Logger struct{}
