@@ -5,7 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
+	"time"
 	"zlutils/caller"
+	"zlutils/metric"
 )
 
 func TestLog(t *testing.T) {
@@ -28,4 +30,20 @@ func TestMidDebug(t *testing.T) {
 		logrus.SetLevel(logrus.InfoLevel) //下次调用就不会输出debug日志
 	})
 	router.Run(":11114")
+}
+
+func TestMetric(t *testing.T) {
+	const projectName = "zlutils"
+	Init(Config{Level: logrus.InfoLevel})
+	InitDefaultMetric(projectName)//这一行注释掉后，metric就没有log count了
+	router := gin.New()
+	router.Group(projectName).GET("metrics", metric.Metrics)
+	go func() {
+		for {
+			logrus.Info("i")
+			logrus.Error("e")
+			time.Sleep(time.Second)
+		}
+	}()
+	router.Run(":11118")
 }

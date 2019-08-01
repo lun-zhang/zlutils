@@ -19,7 +19,9 @@ type MyFormatter struct {
 }
 
 func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
-	//LogCounter.WithLabelValues(e.Level.String()).Inc()
+	if DefaultLogCounter != nil {
+		DefaultLogCounter(e).Inc()
+	}
 	if e.Level != logrus.InfoLevel {
 		if stack, ok := e.Data["stack"]; !ok {
 			e.Data["stack"] = caller.Stack(3) //允许外部记录stack，而不覆盖

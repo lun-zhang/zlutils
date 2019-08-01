@@ -19,9 +19,6 @@ var (
 
 	defaultFuncCounter *prometheus.CounterVec   //func次数
 	defaultFuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
-
-	defaultLogCounter *prometheus.CounterVec //log次数
-	//写日志很快所以没有计时
 )
 
 func InitDefaultMetric(projectName string) {
@@ -73,14 +70,6 @@ func InitDefaultMetric(projectName string) {
 		[]string{"func"},
 	)
 
-	defaultLogCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_log_total", projectName),
-			Help: "Total Log counts",
-		},
-		[]string{"level"},
-	)
-
 	prometheus.MustRegister(
 		defaultRespCounter,
 		defaultRespLatency,
@@ -88,7 +77,6 @@ func InitDefaultMetric(projectName string) {
 		defaultMysqlLatency,
 		defaultFuncCounter,
 		defaultFuncLatency,
-		defaultLogCounter,
 	)
 }
 
