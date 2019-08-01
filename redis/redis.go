@@ -8,8 +8,8 @@ import (
 	"gopkg.in/redis.v5"
 	"reflect"
 	"time"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v6/guard"
 	"zlutils/caller"
+	"zlutils/guard"
 )
 
 //NOTE: 只能用于初始化时候，失败则fatal
