@@ -20,7 +20,7 @@ const (
 
 type sendFunc func(c *gin.Context, data interface{}, err error)
 
-func MidOperator(sendClientQueryErr sendFunc) gin.HandlerFunc {
+func MidOperator(sendClientErrQuery sendFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		operator, err := func(c *gin.Context) (operator Operator, err error) {
 			if err = c.ShouldBindQuery(&operator); err != nil {
@@ -35,8 +35,8 @@ func MidOperator(sendClientQueryErr sendFunc) gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			if sendClientQueryErr != nil {
-				sendClientQueryErr(c, nil, fmt.Errorf("invalid operator, err:%s", err.Error()))
+			if sendClientErrQuery != nil {
+				sendClientErrQuery(c, nil, fmt.Errorf("invalid operator, err:%s", err.Error()))
 			} else {
 				c.JSON(http.StatusBadRequest, nil)
 			}
@@ -70,7 +70,7 @@ const (
 )
 
 //FIXME 感觉这个不是公用的，不改放这里
-func MidUser(sendClientHeaderErr sendFunc) gin.HandlerFunc {
+func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := func(c *gin.Context) (user User, err error) {
 			header := c.Request.Header
@@ -105,8 +105,8 @@ func MidUser(sendClientHeaderErr sendFunc) gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			if sendClientHeaderErr != nil {
-				sendClientHeaderErr(c, nil, fmt.Errorf("invalid user, %s", err.Error()))
+			if sendClientErrHeader != nil {
+				sendClientErrHeader(c, nil, fmt.Errorf("invalid user, %s", err.Error()))
 			} else {
 				c.JSON(http.StatusBadRequest, nil)
 			}
