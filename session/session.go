@@ -1,26 +1,28 @@
-package mid
+package session
 
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"net/http"
 	"strconv"
-	"zlutils/code"
 )
 
-type AdminOperator struct {
+type Operator struct {
 	//请求中获取form，响应中写入json，数据库存gorm
 	OperatorUid  string `gorm:"column:operator_uid" json:"operator_uid" form:"user_id"`
 	OperatorName string `gorm:"column:operator_name" json:"operator_name" form:"username"`
 }
 
 const (
-	KeyAdminOperator = "_key_admin_operator"
-	KeyUser          = "_key_user"
+	KeyOperator = "_key_operator"
+	KeyUser     = "_key_user"
 )
 
-func MidAdminOperator() gin.HandlerFunc {
-	return code.Wrap(func(c *code.Context) {
-		operator, err := func(c *code.Context) (operator AdminOperator, err error) {
+type sendFunc func(c *gin.Context, data interface{}, err error)
+
+func MidOperator(send sendFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		operator, err := func(c *gin.Context) (operator Operator, err error) {
 			if err = c.ShouldBindQuery(&operator); err != nil {
 				return
 			}
@@ -33,25 +35,29 @@ func MidAdminOperator() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			c.Send(nil, code.ClientErrQuery.WithError(fmt.Errorf("invalid operator, err:%s", err.Error())))
+			if send != nil {
+				send(c, nil, fmt.Errorf("invalid operator, err:%s", err.Error()))
+			} else {
+				c.JSON(http.StatusBadRequest, nil)
+			}
 			c.Abort()
 			return
 		}
-		c.Set(KeyAdminOperator, operator)
-	})
+		c.Set(KeyOperator, operator)
+	}
 }
 
 type User struct {
-	UserIdentity   string //NOTE: 不同产品的用户唯一标志不同
-	UserId         string
-	DeviceId       string
-	ProductId      int
-	AcceptLanguage string
+	UserIdentity   string `json:"user_identity"` //NOTE: 不同产品的用户唯一标志不同
+	UserId         string `json:"user_id"`
+	DeviceId       string `json:"device_id"`
+	ProductId      int    `json:"product_id"`
+	AcceptLanguage string `json:"accept_language"`
 }
 
 //NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
-func GetAdminOperator(c *gin.Context) AdminOperator {
-	return c.Value(KeyAdminOperator).(AdminOperator)
+func GetOperator(c *gin.Context) Operator {
+	return c.Value(KeyOperator).(Operator)
 }
 
 func GetUser(c *gin.Context) User {
@@ -64,9 +70,9 @@ const (
 )
 
 //FIXME 感觉这个不是公用的，不改放这里
-func MidUser() gin.HandlerFunc {
-	return code.Wrap(func(c *code.Context) {
-		user, err := func(c *code.Context) (user User, err error) {
+func MidUser(send sendFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, err := func(c *gin.Context) (user User, err error) {
 			header := c.Request.Header
 			user = User{
 				//FIXME 从token中获得用户信息，兼容新token
@@ -99,10 +105,14 @@ func MidUser() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			c.Send(nil, code.ClientErrHeader.WithError(fmt.Errorf("invalid user, %s", err.Error())))
+			if send != nil {
+				send(c, nil, fmt.Errorf("invalid user, %s", err.Error()))
+			} else {
+				c.JSON(http.StatusBadRequest, nil)
+			}
 			c.Abort()
 			return
 		}
 		c.Set(KeyUser, user)
-	})
+	}
 }
