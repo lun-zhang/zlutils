@@ -11,9 +11,6 @@ import (
 var (
 	historyBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
-	defaultRespCounter *prometheus.CounterVec   //请求次数
-	defaultRespLatency *prometheus.HistogramVec //请求耗时，用于alert
-
 	defaultMysqlCounter *prometheus.CounterVec   //mysql查询次数
 	defaultMysqlLatency *prometheus.HistogramVec //mysql耗时
 
@@ -22,15 +19,16 @@ var (
 )
 
 func InitDefaultMetric(projectName string) {
-	defaultRespCounter = prometheus.NewCounterVec(
+	//请求次数
+	defaultRespCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_requests_total", projectName),
 			Help: "Total request counts",
 		},
 		[]string{"endpoint"},
 	)
-
-	defaultRespLatency = prometheus.NewHistogramVec(
+	//请求耗时，用于alert
+	defaultRespLatency := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_response_latency_millisecond", projectName),
 			Help:    "Response latency (millisecond)",
@@ -38,6 +36,7 @@ func InitDefaultMetric(projectName string) {
 		},
 		[]string{"endpoint"},
 	)
+
 	defaultMysqlCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_mysql_total", projectName),
@@ -78,19 +77,24 @@ func InitDefaultMetric(projectName string) {
 		defaultFuncCounter,
 		defaultFuncLatency,
 	)
+
+	DefaultRespCounter = func(c *gin.Context) prometheus.Counter {
+		return defaultRespCounter.WithLabelValues(getEndpoint(c))
+	}
+
+	DefaultRespLatency = func(c *gin.Context) prometheus.Observer {
+		return defaultRespLatency.WithLabelValues(getEndpoint(c))
+	}
 }
 
 func getEndpoint(c *gin.Context) string {
 	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
 }
 
-func DefaultRespCounter(c *gin.Context) prometheus.Counter {
-	return defaultRespCounter.WithLabelValues(getEndpoint(c))
-}
-
-func DefaultRespLatency(c *gin.Context) prometheus.Observer {
-	return defaultRespLatency.WithLabelValues(getEndpoint(c))
-}
+var (
+	DefaultRespCounter fcc
+	DefaultRespLatency fco
+)
 
 func MidRespCounterErr(isServerErr, isClientErr fcb,
 	serverErrCounter, clientErrCounter fcc) gin.HandlerFunc {
@@ -116,16 +120,16 @@ type fcb func(*gin.Context) bool
 type fcc func(*gin.Context) prometheus.Counter
 type fco func(*gin.Context) prometheus.Observer
 
-func MidRespCounterLatency(respCounter fcc, respLatency fco) gin.HandlerFunc {
+func MidRespCounterLatency() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
 		latency := time.Now().Sub(start)
-		if respLatency != nil {
-			respLatency(c).Observe(latency.Seconds() * 1000)
+		if DefaultRespLatency != nil {
+			DefaultRespLatency(c).Observe(latency.Seconds() * 1000)
 		}
-		if respCounter != nil {
-			respCounter(c).Inc()
+		if DefaultRespCounter != nil {
+			DefaultRespCounter(c).Inc()
 		}
 	}
 }

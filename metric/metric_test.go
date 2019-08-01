@@ -38,7 +38,7 @@ func TestMidRespCounterLantency(t *testing.T) {
 	InitDefaultMetric(projectName)
 	router := gin.New()
 	router.Group(projectName).GET("metrics", Metrics) //这样就不会把metric的调用记录下来
-	base := router.Group(projectName, MidRespCounterLatency(DefaultRespCounter, DefaultRespLatency))
+	base := router.Group(projectName, MidRespCounterLatency())
 	base.GET("", func(c *gin.Context) {
 		time.Sleep(time.Millisecond * 100)
 		c.JSON(http.StatusOK, 1)
