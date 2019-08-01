@@ -25,6 +25,7 @@ func TestMidDebug(t *testing.T) {
 	router := gin.New()
 	router.Group("", MidDebug()).GET("logger", func(c *gin.Context) {
 		c.JSON(http.StatusOK, "resp data")
+		logrus.SetLevel(logrus.InfoLevel) //下次调用就不会输出debug日志
 	})
 	router.Run(":11114")
 }
