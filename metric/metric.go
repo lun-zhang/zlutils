@@ -11,45 +11,29 @@ import (
 var (
 	historyBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
-	ResponseCounter *prometheus.CounterVec   //请求次数
-	ResponseLatency *prometheus.HistogramVec //请求耗时，用于alert
+	defaultRespCounter *prometheus.CounterVec   //请求次数
+	defaultRespLatency *prometheus.HistogramVec //请求耗时，用于alert
 
-	ServerErrorCounter *prometheus.CounterVec //服务器错误，用于alter
-	ClientErrorCounter *prometheus.CounterVec //客户端错误
+	defaultMysqlCounter *prometheus.CounterVec   //mysql查询次数
+	defaultMysqlLatency *prometheus.HistogramVec //mysql耗时
 
-	MysqlCounter *prometheus.CounterVec   //mysql查询次数
-	MysqlLatency *prometheus.HistogramVec //mysql耗时
+	defaultFuncCounter *prometheus.CounterVec   //func次数
+	defaultFuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
 
-	FuncCounter *prometheus.CounterVec   //func次数
-	FuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
-
-	LogCounter *prometheus.CounterVec //log次数
+	defaultLogCounter *prometheus.CounterVec //log次数
 	//写日志很快所以没有计时
 )
 
-func Init(projectName string) {
-	ResponseCounter = prometheus.NewCounterVec(
+func InitDefaultMetric(projectName string) {
+	defaultRespCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_requests_total", projectName),
 			Help: "Total request counts",
 		},
 		[]string{"endpoint"},
 	)
-	ServerErrorCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_server_error_total", projectName),
-			Help: "Total Server Error counts",
-		},
-		[]string{"endpoint", "ret"},
-	)
-	ClientErrorCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_client_error_total", projectName),
-			Help: "Total Client Error counts",
-		},
-		[]string{"endpoint", "ret"},
-	)
-	ResponseLatency = prometheus.NewHistogramVec(
+
+	defaultRespLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_response_latency_millisecond", projectName),
 			Help:    "Response latency (millisecond)",
@@ -57,14 +41,14 @@ func Init(projectName string) {
 		},
 		[]string{"endpoint"},
 	)
-	MysqlCounter = prometheus.NewCounterVec(
+	defaultMysqlCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_mysql_total", projectName),
 			Help: "Total Mysql counts",
 		},
 		[]string{"query"},
 	)
-	MysqlLatency = prometheus.NewHistogramVec(
+	defaultMysqlLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_mysql_latency_millisecond", projectName),
 			Help:    "Mysql latency (millisecond)",
@@ -73,14 +57,14 @@ func Init(projectName string) {
 		[]string{"query"},
 	)
 
-	FuncCounter = prometheus.NewCounterVec(
+	defaultFuncCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_func_total", projectName),
 			Help: "Total Func counts",
 		},
 		[]string{"func"},
 	)
-	FuncLatency = prometheus.NewHistogramVec(
+	defaultFuncLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_func_latency_millisecond", projectName),
 			Help:    "Func latency (millisecond)",
@@ -89,7 +73,7 @@ func Init(projectName string) {
 		[]string{"func"},
 	)
 
-	LogCounter = prometheus.NewCounterVec(
+	defaultLogCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_log_total", projectName),
 			Help: "Total Log counts",
@@ -98,20 +82,30 @@ func Init(projectName string) {
 	)
 
 	prometheus.MustRegister(
-		ResponseCounter,
-		ServerErrorCounter,
-		ClientErrorCounter,
-		ResponseLatency,
-		MysqlCounter,
-		MysqlLatency,
-		FuncCounter,
-		FuncLatency,
-		LogCounter,
+		defaultRespCounter,
+		defaultRespLatency,
+		defaultMysqlCounter,
+		defaultMysqlLatency,
+		defaultFuncCounter,
+		defaultFuncLatency,
+		defaultLogCounter,
 	)
 }
 
-func MidCounter(isServerErr, isClientErr fcb,
-	responseCounter, serverErrCounter, clientErrCounter fcc) gin.HandlerFunc {
+func getEndpoint(c *gin.Context) string {
+	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
+}
+
+func DefaultRespCounter(c *gin.Context) prometheus.Counter {
+	return defaultRespCounter.WithLabelValues(getEndpoint(c))
+}
+
+func DefaultRespLatency(c *gin.Context) prometheus.Observer {
+	return defaultRespLatency.WithLabelValues(getEndpoint(c))
+}
+
+func MidRespCounterErr(isServerErr, isClientErr fcb,
+	serverErrCounter, clientErrCounter fcc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
 		statusCode := c.Writer.Status()
@@ -127,9 +121,6 @@ func MidCounter(isServerErr, isClientErr fcb,
 				serverErrCounter(c).Inc()
 			}
 		}
-		if responseCounter != nil {
-			responseCounter(c).Inc()
-		}
 	}
 }
 
@@ -137,19 +128,21 @@ type fcb func(*gin.Context) bool
 type fcc func(*gin.Context) prometheus.Counter
 type fco func(*gin.Context) prometheus.Observer
 
-//不需要skip，不需要的接口不用此中间件即可
-func MidLantency(responseLatency fco) gin.HandlerFunc {
+func MidRespCounterLatency(respCounter fcc, respLatency fco) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		c.Next() //这里面可能发生panic
+		c.Next()
 		latency := time.Now().Sub(start)
-		if responseLatency != nil {
-			responseLatency(c).Observe(latency.Seconds() * 1000)
+		if respLatency != nil {
+			respLatency(c).Observe(latency.Seconds() * 1000)
+		}
+		if respCounter != nil {
+			respCounter(c).Inc()
 		}
 	}
 }
 
-func Serve(c *gin.Context) {
+func Metrics(c *gin.Context) {
 	handler := promhttp.Handler()
 	handler.ServeHTTP(c.Writer, c.Request)
 }

@@ -55,6 +55,8 @@ func IsClientErr(ret int) bool {
 	return ret >= 4000 && ret < 5000
 }
 
+
+
 type Context struct {
 	*gin.Context
 }
