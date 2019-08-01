@@ -1,7 +1,9 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -112,5 +114,46 @@ func Init(config Config) {
 	} else {
 		logrus.SetFormatter(MyFormatter{})
 		logrus.SetOutput(os.Stdout)
+	}
+}
+
+type debugWriter struct {
+	gin.ResponseWriter
+	logId int64
+}
+
+//NOTE: 请求和响应会打两条日志，响应的时候会把请求放在一起再打印一遍，可能会觉得冗余，但好处是完整
+func (w debugWriter) Write(b []byte) (n int, err error) {
+	logrus.WithFields(logrus.Fields{
+		"log_id":        w.logId,
+		"stack":         nil,
+		"response_body": string(b),
+	}).Debug()
+	return w.ResponseWriter.Write(b)
+}
+
+//NOTE: 上线后的接口不该使用这个中间件，对性能有影响
+func MidDebug() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if logrus.IsLevelEnabled(logrus.DebugLevel) { //这样方便watch level
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(c.Request.Body)
+			reqBody := buf.Bytes()
+			logId := time.Now().UnixNano()
+			logrus.WithFields(logrus.Fields{
+				//TODO: 完善字段
+				"log_id":       logId,
+				"path":         c.Request.URL.Path,
+				"method":       c.Request.Method,
+				"header":       c.Request.Header,
+				"request_body": string(reqBody),
+				"stack":        nil,
+			}).Debug()
+			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
+			c.Writer = debugWriter{
+				ResponseWriter: c.Writer,
+				logId:          logId,
+			}
+		}
 	}
 }

@@ -1,11 +1,8 @@
 package mid
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
-	"io/ioutil"
 	"strconv"
 	"zlutils/code"
 )
@@ -108,38 +105,4 @@ func MidUser() gin.HandlerFunc {
 		}
 		c.Set(KeyUser, user)
 	})
-}
-
-//NOTE: 如果想要上线后(level=info)想要某些接口打印日志，则增加一个类似于LogInfoWriter的struct
-type LogDebugWriter struct {
-	gin.ResponseWriter
-}
-
-func (w LogDebugWriter) Write(b []byte) (n int, err error) {
-	logrus.WithFields(logrus.Fields{
-		"stack":         nil,
-		"response_body": string(b),
-	}).Debug()
-	return w.ResponseWriter.Write(b)
-}
-
-//NOTE: 上线后的接口不该使用这个中间件
-//TODO: 以后增加level入参
-func MidLogReqResp() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(c.Request.Body)
-		reqBody := buf.Bytes()
-		logrus.WithFields(logrus.Fields{
-			//TODO: 完善字段
-			"path":         c.Request.URL.Path,
-			"method":       c.Request.Method,
-			"header":       c.Request.Header,
-			"request_body": string(reqBody),
-			"stack":        nil,
-		}).Debug()
-		c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
-		c.Writer = LogDebugWriter{c.Writer}
-		c.Next()
-	}
 }
