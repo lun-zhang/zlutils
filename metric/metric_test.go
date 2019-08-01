@@ -12,7 +12,6 @@ import (
 func TestMidRespCounterErr(t *testing.T) {
 	const projectName = "zlutils"
 	code.InitDefaultMetric(projectName)
-	InitDefaultMetric(projectName)
 	router := gin.New()
 	router.Group(projectName).GET("metrics", Metrics)
 	base := router.Group(projectName, MidRespCounterErr(code.RespIsServerErr,
