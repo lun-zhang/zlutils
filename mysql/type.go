@@ -1,7 +1,6 @@
 package mysql
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -45,12 +44,6 @@ func Scan(dest, src interface{}) (err error) {
 		return fmt.Errorf("src must be []byte")
 	}
 	return json.Unmarshal(bs, dest)
-}
-
-//json列，与数据库的[]byte转换
-type JsonColumn interface {
-	driver.Valuer
-	sql.Scanner
 }
 
 type (
