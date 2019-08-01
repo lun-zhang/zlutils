@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"zlutils/guard"
 	zt "zlutils/time"
 )
 
@@ -158,7 +159,7 @@ func (m RespRet) Check() error {
 }
 
 func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
-
+	defer guard.BeforeCtx(&ctx)(&err)
 	entry := logrus.WithField("m", m)
 
 	request, err := m.GetRequest()

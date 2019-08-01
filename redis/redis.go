@@ -1,12 +1,14 @@
 package redis
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/redis.v5"
 	"reflect"
 	"time"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v6/guard"
 	"zlutils/caller"
 )
 
@@ -41,7 +43,8 @@ type Client struct {
 }
 
 //TODO: 要加ctx的话就用WithContext
-func (client *Client) SetJson(key string, value interface{}, expiration time.Duration) (err error) {
+func (client *Client) SetJson(ctx context.Context, key string, value interface{}, expiration time.Duration) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":        key,
 		"value":      value,
@@ -61,7 +64,8 @@ func (client *Client) SetJson(key string, value interface{}, expiration time.Dur
 	return
 }
 
-func (client *Client) GetJson(key string, value interface{}) (err error) {
+func (client *Client) GetJson(ctx context.Context, key string, value interface{}) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
 	entry := logrus.WithField("key", key)
 	cmd := client.Get(key)
 	entry = entry.WithField("cmd", cmd.String())
@@ -79,7 +83,8 @@ func (client *Client) GetJson(key string, value interface{}) (err error) {
 }
 
 //存成map，方便不存储nil
-func (client *Client) MGetJsonMap(keys []string, mapPtr interface{}) (err error) {
+func (client *Client) MGetJsonMap(ctx context.Context, keys []string, mapPtr interface{}) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
 	rv := reflect.ValueOf(mapPtr)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		err = fmt.Errorf("type %s isn't ptr or is nil", reflect.TypeOf(mapPtr))
@@ -123,7 +128,8 @@ func (client *Client) MGetJsonMap(keys []string, mapPtr interface{}) (err error)
 }
 
 //批量设置为相同的过期时间
-func (client *Client) MultiSetJson(mp map[string]interface{}, expiration time.Duration) (err error) {
+func (client *Client) MultiSetJson(ctx context.Context, mp map[string]interface{}, expiration time.Duration) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
 	entry := logrus.WithField("mp", mp)
 
 	if len(mp) == 0 {

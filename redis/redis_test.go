@@ -1,12 +1,15 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"testing"
 	"time"
 	"zlutils/logger"
 )
+
+var ctx = context.Background()
 
 func TestClient_GetJson(t *testing.T) {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
@@ -20,7 +23,7 @@ func TestClient_GetJson(t *testing.T) {
 		C C      `json:"c"`
 	}
 
-	if err := client.SetJson("a", A{
+	if err := client.SetJson(ctx, "a", A{
 		A: 1,
 		B: "b",
 		C: C{
@@ -31,7 +34,7 @@ func TestClient_GetJson(t *testing.T) {
 	}
 
 	var a A
-	if err := client.GetJson("a", &a); err != nil {
+	if err := client.GetJson(ctx, "a", &a); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Printf("%#v", a)
@@ -40,7 +43,7 @@ func TestClient_GetJson(t *testing.T) {
 func TestClient_MGetJsonMap(t *testing.T) {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	client := New("redis://localhost:6379")
-	if err := client.MultiSetJson(map[string]interface{}{
+	if err := client.MultiSetJson(ctx, map[string]interface{}{
 		"b": 1,
 		"c": "b",
 	}, time.Hour); err != nil {
@@ -48,7 +51,7 @@ func TestClient_MGetJsonMap(t *testing.T) {
 	}
 
 	var mp map[string]interface{}
-	if err := client.MGetJsonMap([]string{"b", "c", "d"}, &mp); err != nil {
+	if err := client.MGetJsonMap(ctx, []string{"b", "c", "d"}, &mp); err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println(mp)
