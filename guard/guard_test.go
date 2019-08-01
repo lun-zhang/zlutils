@@ -3,7 +3,7 @@ package guard
 import (
 	"github.com/gin-gonic/gin"
 	"testing"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v6/code"
+	"zlutils/code"
 )
 
 func TestMid(t *testing.T) {
