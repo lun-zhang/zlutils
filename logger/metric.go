@@ -6,11 +6,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var defaultLogCounter *prometheus.CounterVec //log次数
-//写日志很快所以没有计时
-
 func InitDefaultMetric(projectName string) {
-	defaultLogCounter = prometheus.NewCounterVec(
+	//log次数,写日志很快所以没有计时
+	defaultLogCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_log_total", projectName),
 			Help: "Total Log counts",
