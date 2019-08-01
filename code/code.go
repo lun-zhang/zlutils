@@ -91,6 +91,10 @@ func RespIsClientErr(c *gin.Context) bool {
 }
 
 func (c *Context) Send(data interface{}, err error) {
+	Send(c.Context, data, err)
+}
+
+func Send(c *gin.Context, data interface{}, err error) {
 	var code Code
 	if err == nil {
 		code = Success
