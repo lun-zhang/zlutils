@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"zlutils/caller"
+	"zlutils/guard"
 )
 
 //用于填充xray的中间件
@@ -122,23 +123,21 @@ func clientIP(r *http.Request) (string, bool) {
 }
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
-//没必要记录err，因为err携带信息太少，看日志才行，而且同一个err没必要每个函数都记录一次
-//保护函数不会panic，panic会转化成err
-type closeSeg func(*error)
-
-func BeginSubsegment(ctxp *context.Context) closeSeg {
+func BeginSeg(ctxp *context.Context) guard.RecoverFunc {
+	if ctxp == nil { //如果传入nil，则返回默认的保护函数
+		return guard.DefaultRecover
+	}
 	var seg *xray.Segment
-	*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(2))
-	return CloseSeg(seg)
-}
-func BeginSegment(ctxp *context.Context) closeSeg {
-	var seg *xray.Segment
-	*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(2))
+	if xray.GetSegment(*ctxp) == nil {
+		*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(2))
+	} else {
+		*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(2))
+	}
 	return CloseSeg(seg)
 }
 
 //目前panic和*errp!=nil顶多发生一个
-func CloseSeg(seg *xray.Segment) closeSeg {
+var CloseSeg = func(seg *xray.Segment) guard.RecoverFunc {
 	return func(errp *error) {
 		var err error
 		if r := recover(); r != nil { //NOTE: 即使panic也要close

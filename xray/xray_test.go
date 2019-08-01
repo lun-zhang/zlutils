@@ -3,13 +3,15 @@ package xray
 import (
 	"context"
 	"fmt"
-	"github.com/fvbock/endless"
+	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"testing"
 	"zlutils/code"
+	"zlutils/guard"
 )
 
 func TestMid(t *testing.T) {
+	guard.BeforeCtx = BeginSeg
 	router := gin.New()
 	router.Use(Mid("zlutils", nil,
 		code.RespIsServerErr, code.RespIsClientErr))
@@ -25,14 +27,21 @@ func TestMid(t *testing.T) {
 	router.GET("err/seg", code.Wrap(func(c *code.Context) {
 		c.Send("seg err", f1(c.Request.Context()))
 	}))
-	endless.ListenAndServe(":11112", router)
+	router.Run(":11112")
 }
 
 func f1(ctx context.Context) (err error) {
-	defer BeginSubsegment(&ctx)(&err)
+	fmt.Println(xray.GetSegment(ctx))
+	defer guard.BeforeCtx(&ctx)(&err)
 	return f2(ctx)
 }
 func f2(ctx context.Context) (err error) {
-	defer BeginSubsegment(&ctx)(&err)
+	defer guard.BeforeCtx(&ctx)(&err)
 	return fmt.Errorf("f2 err")
+}
+
+func TestBeginSeg(t *testing.T) {
+	guard.BeforeCtx = BeginSeg
+	ctx := context.Background()
+	fmt.Println(f1(ctx))
 }
