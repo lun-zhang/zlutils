@@ -8,7 +8,7 @@ import (
 
 func InitDefaultMetric(projectName string) {
 	//log次数,写日志很快所以没有计时
-	defaultLogCounter := prometheus.NewCounterVec(
+	defaultCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_log_total", projectName),
 			Help: "Total Log counts",
@@ -16,13 +16,13 @@ func InitDefaultMetric(projectName string) {
 		[]string{"level"},
 	)
 	prometheus.MustRegister(
-		defaultLogCounter,
+		defaultCounter,
 	)
-	LogCounter = func(entry *logrus.Entry) prometheus.Counter {
-		return defaultLogCounter.WithLabelValues(entry.Level.String())
+	MetricCounter = func(entry *logrus.Entry) prometheus.Counter {
+		return defaultCounter.WithLabelValues(entry.Level.String())
 	}
 }
 
 type fec func(entry *logrus.Entry) prometheus.Counter
 
-var LogCounter fec
+var MetricCounter fec

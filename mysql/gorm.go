@@ -25,7 +25,8 @@ func (l Logger) Print(values ...interface{}) {
 		duration := values[2].(time.Duration)
 		// sql
 		query := values[3].(string)
-		sql := gorm.PrintSQL(query, values[4].([]interface{})...)
+		args := values[4].([]interface{})
+		sql := gorm.PrintSQL(query, args...)
 
 		entry = entry.WithFields(logrus.Fields{
 			"sql":      sql,
@@ -37,9 +38,8 @@ func (l Logger) Print(values ...interface{}) {
 		} else {
 			entry.Debug()
 		}
-		//query = strings.Replace(query, "?,", "", -1) //FIXME 改成更好的做法，把IN(?,...)替换成IN(...)
-		//MysqlCounter.WithLabelValues(query).Inc()
-		//MysqlLatency.WithLabelValues(query).Observe(duration.Seconds() * 1000)
+		MetricCounter(query, args...).Inc()
+		MetricLatency(query, args...).Observe(duration.Seconds() * 1000)
 	} else {
 		entry.Debug(values[2:]) //NOTE: error时候会先到这里，不打error日志，让外面去打，因为外面还有其他信息
 	}

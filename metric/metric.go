@@ -11,9 +11,6 @@ import (
 var (
 	HistoryBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
-	defaultMysqlCounter *prometheus.CounterVec   //mysql查询次数
-	defaultMysqlLatency *prometheus.HistogramVec //mysql耗时
-
 	defaultFuncCounter *prometheus.CounterVec   //func次数
 	defaultFuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
 )
@@ -37,22 +34,6 @@ func InitDefaultMetric(projectName string) {
 		[]string{"endpoint"},
 	)
 
-	defaultMysqlCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_mysql_total", projectName),
-			Help: "Total Mysql counts",
-		},
-		[]string{"query"},
-	)
-	defaultMysqlLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    fmt.Sprintf("%s_mysql_latency_millisecond", projectName),
-			Help:    "Mysql latency (millisecond)",
-			Buckets: HistoryBuckets,
-		},
-		[]string{"query"},
-	)
-
 	defaultFuncCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_func_total", projectName),
@@ -72,8 +53,6 @@ func InitDefaultMetric(projectName string) {
 	prometheus.MustRegister(
 		defaultRespCounter,
 		defaultRespLatency,
-		defaultMysqlCounter,
-		defaultMysqlLatency,
 		defaultFuncCounter,
 		defaultFuncLatency,
 	)
