@@ -90,7 +90,8 @@ type Config struct {
 	Level  logrus.Level `json:"level"`
 	Output *Output      `json:"output"`
 }
-type Output struct { //如果nil则输出到屏幕
+type Output struct {
+	//如果nil则输出到屏幕
 	Dir           string `json:"dir"`
 	RotationCount int    `json:"rotation_count"`
 }
@@ -156,6 +157,21 @@ func MidDebug() gin.HandlerFunc {
 				ResponseWriter: c.Writer,
 				logId:          logId,
 			}
+		}
+	}
+}
+
+func MidInfo() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if logrus.IsLevelEnabled(logrus.InfoLevel) {
+			start := time.Now()
+			c.Next()
+			logrus.WithFields(logrus.Fields{
+				"statusCode": c.Writer.Status(),
+				"latency":    time.Now().Sub(start).String(),
+				"clientIP":   c.ClientIP(),
+				"endpoint":   fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method),
+			}).Info()
 		}
 	}
 }

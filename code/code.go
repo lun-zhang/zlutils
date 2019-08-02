@@ -55,8 +55,6 @@ func IsClientErr(ret int) bool {
 	return ret >= 4000 && ret < 5000
 }
 
-
-
 type Context struct {
 	*gin.Context
 }
@@ -66,6 +64,21 @@ type HandelFunc func(*Context)
 func Wrap(f HandelFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		f(&Context{c})
+	}
+}
+
+const keyRespWithErr = "_key_resp_show_err"
+
+//使用此中间件的接口，输出带上err信息
+//closeInRelease=true时候，则不在正式环境输出，其他环境输出
+//例如app接口，正式环境不输出，测试环境输出，则设置closeInRelease=true
+//admin、rpc接口任何环境都输出，则设置closeInRelease=false
+func MidRespWithErr(closeInRelease bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if closeInRelease && gin.Mode() == gin.ReleaseMode {
+			return
+		}
+		c.Set(keyRespWithErr, 1) //数字没啥意义
 	}
 }
 
@@ -107,16 +120,13 @@ func Send(c *gin.Context, data interface{}, err error) {
 		}
 	}
 	if code.Err != nil {
-		//TODO: 应当只有正式的app不输出，其他都输出，如何解耦？
-		//if _, ok := c.Get(KeyAdminOperator); ok || //NOTE: 管理后台请求的错误全部输出，包括服务器错误
-		//	logrus.IsLevelEnabled(logrus.DebugLevel) || //NOTE: 非正式环境全部输出，方便调试
-		//	!RetIsServerErr(code.Ret) { //NOTE: 正式环境，禁止打印服务器错误，因为可能暴露服务器信息
-		if code.Msg == "" {
-			code.Msg = code.Err.Error()
-		} else {
-			code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+		if _, ok := c.Get(keyRespWithErr); ok {
+			if code.Msg == "" {
+				code.Msg = code.Err.Error()
+			} else {
+				code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+			}
 		}
-		//}
 	}
 
 	if code.Ret != 0 {

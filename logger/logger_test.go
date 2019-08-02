@@ -35,7 +35,7 @@ func TestMidDebug(t *testing.T) {
 func TestMetric(t *testing.T) {
 	const projectName = "zlutils"
 	Init(Config{Level: logrus.InfoLevel})
-	InitDefaultMetric(projectName)//这一行注释掉后，metric就没有log count了
+	InitDefaultMetric(projectName) //这一行注释掉后，metric就没有log count了
 	router := gin.New()
 	router.Group(projectName).GET("metrics", metric.Metrics)
 	go func() {
@@ -46,4 +46,14 @@ func TestMetric(t *testing.T) {
 		}
 	}()
 	router.Run(":11118")
+}
+
+func TestMidInfo(t *testing.T) {
+	router := gin.New()
+	router.Use(MidInfo())
+	router.GET("info", func(c *gin.Context) {
+		time.Sleep(time.Millisecond * 100)
+		c.JSON(http.StatusOK, 1)
+	})
+	router.Run(":11121")
 }
