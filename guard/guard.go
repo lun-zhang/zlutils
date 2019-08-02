@@ -27,12 +27,8 @@ type RecoverFunc func(errp *error)                         //把panic变成err�
 type BeforeFunc func(args ...interface{}) RecoverFunc      //这个虽然灵活，但是不便于在编译时发现错误
 type BeforeCtxFunc func(ctxp *context.Context) RecoverFunc //会修改ctx
 
-var DefaultBeforeCtx BeforeCtxFunc = func(ctxp *context.Context) RecoverFunc {
-	return DefaultRecover
-}
-
 //默认的可以把panic转化成err，并打日志
-var DefaultRecover RecoverFunc = func(errp *error) {
+var Recover RecoverFunc = func(errp *error) {
 	if r := recover(); r != nil {
 		err := fmt.Errorf("panic: %+v", r)
 		logrus.WithError(err).Error()
@@ -43,5 +39,5 @@ var DefaultRecover RecoverFunc = func(errp *error) {
 }
 
 var BeforeCtx = func(ctxp *context.Context) RecoverFunc {
-	return DefaultBeforeCtx(ctxp)
+	return Recover
 }

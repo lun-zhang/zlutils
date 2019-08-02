@@ -125,7 +125,7 @@ func clientIP(r *http.Request) (string, bool) {
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
 func BeginSeg(ctxp *context.Context) guard.RecoverFunc {
 	if ctxp == nil { //如果传入nil，则返回默认的保护函数
-		return guard.DefaultRecover
+		return guard.Recover
 	}
 	var seg *xray.Segment
 	if xray.GetSegment(*ctxp) == nil {
@@ -137,7 +137,7 @@ func BeginSeg(ctxp *context.Context) guard.RecoverFunc {
 }
 
 //目前panic和*errp!=nil顶多发生一个
-var CloseSeg = func(seg *xray.Segment) guard.RecoverFunc {
+func CloseSeg(seg *xray.Segment) guard.RecoverFunc {
 	return func(errp *error) {
 		var err error
 		if r := recover(); r != nil { //NOTE: 即使panic也要close
@@ -152,7 +152,5 @@ var CloseSeg = func(seg *xray.Segment) guard.RecoverFunc {
 			}
 		}
 		seg.Close(err) //如果panic，这里可以记录到
-		//FuncCounter.WithLabelValues(seg.Name).Inc()
-		//FuncLatency.WithLabelValues(seg.Name).Observe((seg.EndTime - seg.StartTime) * 1000)
 	}
 }

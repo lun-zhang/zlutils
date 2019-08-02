@@ -10,9 +10,6 @@ import (
 
 var (
 	HistoryBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
-
-	defaultFuncCounter *prometheus.CounterVec   //func次数
-	defaultFuncLatency *prometheus.HistogramVec //func耗时，虽然xray里也有
 )
 
 func InitDefaultMetric(projectName string) {
@@ -34,27 +31,9 @@ func InitDefaultMetric(projectName string) {
 		[]string{"endpoint"},
 	)
 
-	defaultFuncCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_func_total", projectName),
-			Help: "Total Func counts",
-		},
-		[]string{"func"},
-	)
-	defaultFuncLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    fmt.Sprintf("%s_func_latency_millisecond", projectName),
-			Help:    "Func latency (millisecond)",
-			Buckets: HistoryBuckets,
-		},
-		[]string{"func"},
-	)
-
 	prometheus.MustRegister(
 		defaultRespCounter,
 		defaultRespLatency,
-		defaultFuncCounter,
-		defaultFuncLatency,
 	)
 
 	RespCounter = func(c *gin.Context) prometheus.Counter {
