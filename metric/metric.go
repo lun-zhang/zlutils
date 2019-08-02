@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	historyBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
+	HistoryBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 
 	defaultMysqlCounter *prometheus.CounterVec   //mysql查询次数
 	defaultMysqlLatency *prometheus.HistogramVec //mysql耗时
@@ -32,7 +32,7 @@ func InitDefaultMetric(projectName string) {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_response_latency_millisecond", projectName),
 			Help:    "Response latency (millisecond)",
-			Buckets: historyBuckets,
+			Buckets: HistoryBuckets,
 		},
 		[]string{"endpoint"},
 	)
@@ -48,7 +48,7 @@ func InitDefaultMetric(projectName string) {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_mysql_latency_millisecond", projectName),
 			Help:    "Mysql latency (millisecond)",
-			Buckets: historyBuckets,
+			Buckets: HistoryBuckets,
 		},
 		[]string{"query"},
 	)
@@ -64,7 +64,7 @@ func InitDefaultMetric(projectName string) {
 		prometheus.HistogramOpts{
 			Name:    fmt.Sprintf("%s_func_latency_millisecond", projectName),
 			Help:    "Func latency (millisecond)",
-			Buckets: historyBuckets,
+			Buckets: HistoryBuckets,
 		},
 		[]string{"func"},
 	)
@@ -78,11 +78,11 @@ func InitDefaultMetric(projectName string) {
 		defaultFuncLatency,
 	)
 
-	DefaultRespCounter = func(c *gin.Context) prometheus.Counter {
+	RespCounter = func(c *gin.Context) prometheus.Counter {
 		return defaultRespCounter.WithLabelValues(getEndpoint(c))
 	}
 
-	DefaultRespLatency = func(c *gin.Context) prometheus.Observer {
+	RespLatency = func(c *gin.Context) prometheus.Observer {
 		return defaultRespLatency.WithLabelValues(getEndpoint(c))
 	}
 }
@@ -92,8 +92,8 @@ func getEndpoint(c *gin.Context) string {
 }
 
 var (
-	DefaultRespCounter fcc
-	DefaultRespLatency fco
+	RespCounter fcc
+	RespLatency fco
 )
 
 func MidRespCounterErr(isServerErr, isClientErr fcb,
@@ -125,11 +125,11 @@ func MidRespCounterLatency() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		latency := time.Now().Sub(start)
-		if DefaultRespLatency != nil {
-			DefaultRespLatency(c).Observe(latency.Seconds() * 1000)
+		if RespLatency != nil {
+			RespLatency(c).Observe(latency.Seconds() * 1000)
 		}
-		if DefaultRespCounter != nil {
-			DefaultRespCounter(c).Inc()
+		if RespCounter != nil {
+			RespCounter(c).Inc()
 		}
 	}
 }

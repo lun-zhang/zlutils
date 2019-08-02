@@ -19,8 +19,8 @@ type MyFormatter struct {
 }
 
 func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
-	if DefaultLogCounter != nil {
-		DefaultLogCounter(e).Inc()
+	if LogCounter != nil {
+		LogCounter(e).Inc()
 	}
 	if e.Level != logrus.InfoLevel {
 		if stack, ok := e.Data["stack"]; !ok {

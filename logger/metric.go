@@ -18,11 +18,11 @@ func InitDefaultMetric(projectName string) {
 	prometheus.MustRegister(
 		defaultLogCounter,
 	)
-	DefaultLogCounter = func(entry *logrus.Entry) prometheus.Counter {
+	LogCounter = func(entry *logrus.Entry) prometheus.Counter {
 		return defaultLogCounter.WithLabelValues(entry.Level.String())
 	}
 }
 
 type fec func(entry *logrus.Entry) prometheus.Counter
 
-var DefaultLogCounter fec
+var LogCounter fec
