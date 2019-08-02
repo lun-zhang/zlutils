@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-type Logger struct{}
+type sqlLogger struct{}
 
 //NOTE: 打印到logrus、trace、xray
-func (l Logger) Print(values ...interface{}) {
+func (l sqlLogger) Print(values ...interface{}) {
 	if len(values) <= 1 {
 		return
 	}
@@ -38,8 +38,12 @@ func (l Logger) Print(values ...interface{}) {
 		} else {
 			entry.Debug()
 		}
-		MetricCounter(query, args...).Inc()
-		MetricLatency(query, args...).Observe(duration.Seconds() * 1000)
+		if MetricCounter != nil {
+			MetricCounter(query, args...).Inc()
+		}
+		if MetricLatency != nil {
+			MetricLatency(query, args...).Observe(duration.Seconds() * 1000)
+		}
 	} else {
 		entry.Debug(values[2:]) //NOTE: error时候会先到这里，不打error日志，让外面去打，因为外面还有其他信息
 	}
@@ -54,7 +58,7 @@ func New(config Config) *gorm.DB {
 	}
 	db.DB().SetMaxOpenConns(config.MaxOpenConns)
 	db.DB().SetMaxIdleConns(config.MaxIdleConns)
-	db.LogMode(true).SetLogger(&Logger{})
+	db.LogMode(true).SetLogger(&sqlLogger{})
 	entry.Info("mysql connect ok")
 	return db
 }
@@ -67,7 +71,7 @@ func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	}
 	config.Master.setConns(db)
 	config.Slave.setConns(db)
-	db.LogMode(true).SetLogger(&Logger{})
+	db.LogMode(true).SetLogger(&sqlLogger{})
 	entry.Info("mysql connect ok")
 	return db
 }

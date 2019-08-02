@@ -11,7 +11,8 @@ import (
 )
 
 func TestMid(t *testing.T) {
-	guard.BeforeCtx = BeginSeg
+	guard.DoBeforeCtx = DoBeforeCtx
+	guard.DoAfter = DoAfter
 	router := gin.New()
 	router.Use(Mid("zlutils", nil,
 		code.RespIsServerErr, code.RespIsClientErr))
@@ -37,11 +38,12 @@ func f1(ctx context.Context) (err error) {
 }
 func f2(ctx context.Context) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
-	return fmt.Errorf("f2 err")
+	return nil
 }
 
 func TestBeginSeg(t *testing.T) {
-	guard.BeforeCtx = BeginSeg
+	guard.DoBeforeCtx = DoBeforeCtx
+	guard.DoAfter = DoAfter
 	ctx := context.Background()
 	fmt.Println(f1(ctx))
 }

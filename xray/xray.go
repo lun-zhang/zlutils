@@ -3,7 +3,6 @@ package xray
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/aws/aws-xray-sdk-go/header"
 	"github.com/aws/aws-xray-sdk-go/strategy/sampling"
 	"github.com/aws/aws-xray-sdk-go/xray"
@@ -14,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"zlutils/caller"
-	"zlutils/guard"
 )
 
 //用于填充xray的中间件
@@ -123,34 +121,19 @@ func clientIP(r *http.Request) (string, bool) {
 }
 
 //凡是调用了该函数，再去调用其他函数时，传递的都是sub ctx
-func BeginSeg(ctxp *context.Context) guard.RecoverFunc {
-	if ctxp == nil { //如果传入nil，则返回默认的保护函数
-		return guard.Recover
-	}
+//NOTE: 如果ctxp==nil,则panic
+func DoBeforeCtx(ctxp *context.Context) (args []interface{}) {
 	var seg *xray.Segment
 	if xray.GetSegment(*ctxp) == nil {
-		*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(2))
+		*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(3))
 	} else {
-		*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(2))
+		*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(3))
 	}
-	return CloseSeg(seg)
+	return []interface{}{seg}
 }
 
-//目前panic和*errp!=nil顶多发生一个
-func CloseSeg(seg *xray.Segment) guard.RecoverFunc {
-	return func(errp *error) {
-		var err error
-		if r := recover(); r != nil { //NOTE: 即使panic也要close
-			err = fmt.Errorf("panic: %+v", r)
-			//err = code.ServerErrPainc.WithErrorf("panic: %+v", r) //recover赋到*errp上，不再抛出panic
-			if errp != nil {
-				*errp = err
-			}
-		} else {
-			if errp != nil {
-				err = *errp
-			}
-		}
-		seg.Close(err) //如果panic，这里可以记录到
-	}
+//NOTE: 配套使用就不会有问题，否则panic
+func DoAfter(err error, args ...interface{}) {
+	seg := args[0].(*xray.Segment)
+	seg.Close(err)
 }
