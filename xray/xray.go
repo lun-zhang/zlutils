@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 	"zlutils/caller"
 )
 
@@ -124,10 +125,11 @@ func clientIP(r *http.Request) (string, bool) {
 //NOTE: 如果ctxp==nil,则panic
 func DoBeforeCtx(ctxp *context.Context) (args []interface{}) {
 	var seg *xray.Segment
+	source := NameReplace(caller.Caller(3))
 	if xray.GetSegment(*ctxp) == nil {
-		*ctxp, seg = xray.BeginSegment(*ctxp, caller.Caller(3))
+		*ctxp, seg = xray.BeginSegment(*ctxp, source)
 	} else {
-		*ctxp, seg = xray.BeginSubsegment(*ctxp, caller.Caller(3))
+		*ctxp, seg = xray.BeginSubsegment(*ctxp, source)
 	}
 	return []interface{}{seg}
 }
@@ -136,4 +138,49 @@ func DoBeforeCtx(ctxp *context.Context) (args []interface{}) {
 func DoAfter(err error, args ...interface{}) {
 	seg := args[0].(*xray.Segment)
 	seg.Close(err)
+}
+
+var nameValidSymbolMap = map[rune]struct{}{
+	'_':  {},
+	'.':  {},
+	':':  {},
+	'/':  {},
+	'%':  {},
+	'&':  {},
+	'#':  {},
+	'=':  {},
+	'+':  {},
+	'\\': {},
+	'-':  {},
+	'@':  {},
+}
+
+func nameRuneIsValid(r rune) bool {
+	if unicode.IsDigit(r) {
+		return true
+	}
+	if unicode.IsLetter(r) {
+		return true
+	}
+	if unicode.IsSpace(r) {
+		return true
+	}
+	if _, ok := nameValidSymbolMap[r]; ok {
+		return true
+	}
+	return false
+}
+
+//替换成合法字符
+// TODO: 如果用户觉得非法字符都替换成'-'不满意，可以自行修改
+var NameReplace = func(name string) string {
+	rs := make([]rune, len(name))
+	for i, r := range name {
+		if nameRuneIsValid(r) {
+			rs[i] = r
+		} else {
+			rs[i] = '-'
+		}
+	}
+	return string(rs)
 }

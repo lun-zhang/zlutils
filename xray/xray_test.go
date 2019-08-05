@@ -28,7 +28,20 @@ func TestMid(t *testing.T) {
 	router.GET("err/seg", code.Wrap(func(c *code.Context) {
 		c.Send("seg err", f1(c.Request.Context()))
 	}))
+	router.GET("replace", func(c *gin.Context) {
+		s := &S{}
+		s.f(c.Request.Context())
+		code.Send(c, "r", nil)
+	})
 	router.Run(":11112")
+}
+
+type S struct {
+}
+
+func (s *S) f(ctx context.Context) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+	return
 }
 
 func f1(ctx context.Context) (err error) {
