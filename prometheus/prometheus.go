@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"time"
 	"zlutils/guard"
@@ -32,12 +33,13 @@ func getAddressOnEcs() (address string, err error) {
 		logrus.WithError(err).Error()
 		return
 	}
-	f, err := os.Open(ecsMeta)
+	entry := logrus.WithField("ecsMeta", ecsMeta)
+	ecsData, err := ioutil.ReadFile(ecsMeta)
 	if err != nil {
-		logrus.WithError(err).Warn("read ecs meta file failed")
+		entry.WithError(err).Warn("read ecs meta file failed")
 		return
 	}
-	defer f.Close()
+	entry = entry.WithField("ecsData", string(ecsData))
 
 	var metaData struct {
 		PortMappings []struct {
@@ -46,13 +48,14 @@ func getAddressOnEcs() (address string, err error) {
 		HostPrivateIPv4Address string `json:"HostPrivateIPv4Address"`
 		MetadataFileStatus     string `json:"MetadataFileStatus"`
 	}
-	if err = json.NewDecoder(f).Decode(metaData); err != nil {
-		logrus.WithError(err).Error("decode meta json failed")
+	if err = json.Unmarshal(ecsData, &metaData); err != nil {
+		entry.WithError(err).Error("decode meta json failed")
 		return
 	}
+	entry = entry.WithField("metaData", metaData)
 	if metaData.MetadataFileStatus != "READY" || len(metaData.PortMappings) == 0 {
 		err = fmt.Errorf("hasn't ready")
-		logrus.WithError(err).Error()
+		entry.WithError(err).Error()
 		return
 	}
 	return fmt.Sprintf("%s:%d", metaData.HostPrivateIPv4Address, metaData.PortMappings[0].HostPort), nil
