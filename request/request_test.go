@@ -3,7 +3,6 @@ package request
 import (
 	"context"
 	"fmt"
-	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
@@ -15,7 +14,8 @@ import (
 var ctx context.Context
 
 func init() {
-	ctx, _ = xray.BeginSegment(context.Background(), "init")
+	ctx = context.Background()
+	//ctx, _ = xray.BeginSegment(context.Background(), "init")
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
 }
 

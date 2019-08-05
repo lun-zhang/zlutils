@@ -174,7 +174,10 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 	if m.Client != nil {
 		client = m.Client.GetClient()
 	}
-	resp, err := ctxhttp.Do(ctx, xray.Client(client), request)
+	if seg := xray.GetSegment(ctx); seg != nil { //允许不传xray的ctx
+		client = xray.Client(client)
+	}
+	resp, err := ctxhttp.Do(ctx, client, request)
 	if err != nil { //超时
 		//err = code.ServerErrRpc.WithError(err)
 		entry.WithError(err).Error()
