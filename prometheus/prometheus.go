@@ -58,13 +58,42 @@ func getAddressOnEcs() (address string, err error) {
 		entry.WithError(err).Error()
 		return
 	}
+	entry.Debug()
 	return fmt.Sprintf("%s:%d", metaData.HostPrivateIPv4Address, metaData.PortMappings[0].HostPort), nil
 }
 
-func Register(requestConfig request.Config, jobName, metricsPath string) (unregister func(), err error) {
+var reqCh = make(chan request.Request, 1)
+
+func Unregister() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	defer guard.BeforeCtx(&ctx)(&err)
+	var resp request.RespRet
+
+	select {
+	case req, ok := <-reqCh:
+		if ok {
+			if err = req.Do(ctx, &resp); err != nil {
+				return
+			}
+			logrus.WithField("req", req).Info("unregister ok")
+		}
+		//case <-time.After(timeout):
+		//	err = fmt.Errorf("no req after %s timeout", timeout)
+		//	logrus.WithError(err).Error()
+	}
+	return
+}
+
+func Register(requestConfig request.Config, jobName, metricsPath string) (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer guard.BeforeCtx(&ctx)(&err)
+	defer func() {
+		if err != nil {
+			close(reqCh)
+		}
+	}()
 	addr, err := GetAddress()
 	if err != nil {
 		return
@@ -84,24 +113,16 @@ func Register(requestConfig request.Config, jobName, metricsPath string) (unregi
 	if err = req.Do(ctx, &resp); err != nil {
 		return
 	}
-	return func() {
-		var err error
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		defer guard.BeforeCtx(&ctx)(&err)
-		var resp request.RespRet
-		req := request.Request{
-			Config: requestConfig,
-			Body: request.MSI{
-				"job_name":     jobName,
-				"metrics_path": metricsPath,
-				"rem_targets": []string{
-					addr,
-				},
+	logrus.WithField("req", req).Info("register ok")
+	reqCh <- request.Request{
+		Config: requestConfig,
+		Body: request.MSI{
+			"job_name":     jobName,
+			"metrics_path": metricsPath,
+			"rem_targets": []string{
+				addr,
 			},
-		}
-		if err = req.Do(ctx, &resp); err != nil {
-			return
-		}
-	}, nil
+		},
+	}
+	return
 }
