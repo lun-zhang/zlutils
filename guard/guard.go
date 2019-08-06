@@ -50,6 +50,10 @@ var (
 //	}
 //}
 
+var PanicToError = func(i interface{}) error {
+	return fmt.Errorf("panic: %+v", i)
+}
+
 func BeforeCtx(ctxp *context.Context) AfterFunc {
 	start := time.Now()
 	name := caller.Caller(2)
@@ -58,7 +62,7 @@ func BeforeCtx(ctxp *context.Context) AfterFunc {
 		return func(errp *error) {
 			var err error
 			if r := recover(); r != nil {
-				err = fmt.Errorf("panic: %+v", r)
+				err = PanicToError(r)
 				logrus.WithError(err).Error() //一般不在其他地方打
 				if errp != nil {
 					*errp = err

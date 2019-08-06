@@ -16,8 +16,8 @@ func TestMidRespCounterErr(t *testing.T) {
 	router.Group(projectName).GET("metrics", Metrics)
 	base := router.Group(projectName, MidRespCounterErr(code.RespIsServerErr,
 		code.RespIsClientErr,
-		code.DefaultServerErrorCounter,
-		code.DefaultClientErrorCounter))
+		code.ServerErrorCounter,
+		code.ClientErrorCounter))
 	{
 		counterErr := base.Group("counter/err")
 		counterErr.GET("server", func(c *gin.Context) {

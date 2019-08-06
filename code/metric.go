@@ -4,23 +4,19 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	"net/http"
 	"strconv"
 )
 
-var (
-	defaultServerErrorCounter *prometheus.CounterVec //服务器错误，用于alter
-	defaultClientErrorCounter *prometheus.CounterVec //客户端错误
-)
-
 func InitDefaultMetric(projectName string) {
-	defaultServerErrorCounter = prometheus.NewCounterVec(
+	serverErrorCounter := prometheus.NewCounterVec( //服务器错误，用于alert
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_server_error_total", projectName),
 			Help: "Total Server Error counts",
 		},
 		[]string{"endpoint", "ret"},
 	)
-	defaultClientErrorCounter = prometheus.NewCounterVec(
+	clientErrorCounter := prometheus.NewCounterVec( //客户端错误
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_client_error_total", projectName),
 			Help: "Total Client Error counts",
@@ -28,9 +24,16 @@ func InitDefaultMetric(projectName string) {
 		[]string{"endpoint", "ret"},
 	)
 	prometheus.MustRegister(
-		defaultServerErrorCounter,
-		defaultClientErrorCounter,
+		serverErrorCounter,
+		clientErrorCounter,
 	)
+
+	ServerErrorCounter = func(c *gin.Context) prometheus.Counter {
+		return serverErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
+	}
+	ClientErrorCounter = func(c *gin.Context) prometheus.Counter {
+		return clientErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
+	}
 }
 
 func getEndpoint(c *gin.Context) string {
@@ -40,14 +43,16 @@ func getEndpoint(c *gin.Context) string {
 func getRet(c *gin.Context) string {
 	ret, ok := GetRet(c)
 	if !ok {
-		return "no_ret"
+		if c.Writer.Status() == http.StatusNotFound {
+			ret = ClientErr404.Ret
+		} else {
+			return "no_ret"
+		}
 	}
 	return strconv.Itoa(ret)
 }
 
-func DefaultServerErrorCounter(c *gin.Context) prometheus.Counter {
-	return defaultServerErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
-}
-func DefaultClientErrorCounter(c *gin.Context) prometheus.Counter {
-	return defaultClientErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
-}
+var (
+	ServerErrorCounter func(*gin.Context) prometheus.Counter
+	ClientErrorCounter func(*gin.Context) prometheus.Counter
+)
