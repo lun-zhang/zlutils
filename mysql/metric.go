@@ -31,7 +31,7 @@ func InitDefaultMetric(projectName string) {
 		return defaultCounter.WithLabelValues(getSampleQuery(query))
 	}
 	MetricLatency = func(query string, args ...interface{}) prometheus.Observer {
-		return defaultLatency.WithLabelValues(query)
+		return defaultLatency.WithLabelValues(getSampleQuery(query))
 	}
 }
 
