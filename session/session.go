@@ -53,6 +53,7 @@ type User struct {
 	DeviceId       string `json:"device_id"`
 	ProductId      int    `json:"product_id"`
 	AcceptLanguage string `json:"accept_language"`
+	VersionCode    int    `json:"version_code"`
 }
 
 //NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
@@ -74,11 +75,13 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := func(c *gin.Context) (user User, err error) {
 			header := c.Request.Header
+			vc, _ := strconv.Atoi(header.Get("Version-Code"))
 			user = User{
 				//FIXME 从token中获得用户信息，兼容新token
 				UserId:         header.Get("User-Id"),
 				DeviceId:       header.Get("Device-Id"),
 				AcceptLanguage: header.Get("Accept-Language"),
+				VersionCode:    vc,
 			}
 			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
 			switch user.ProductId {
