@@ -2,13 +2,16 @@ package logger
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 	"zlutils/caller"
 )
@@ -125,12 +128,21 @@ type debugWriter struct {
 	logId int64
 }
 
+func tryGetJson(header http.Header, b []byte) (resp interface{}) {
+	if strings.Contains(header.Get("Content-Type"), "application/json") {
+		if er := json.Unmarshal(b, &resp); er == nil {
+			return
+		}
+	}
+	return string(b) //FIXME: 不会用非打印字符吧
+}
+
 //NOTE: 请求和响应会打两条日志，响应的时候会把请求放在一起再打印一遍，可能会觉得冗余，但好处是完整
 func (w debugWriter) Write(b []byte) (n int, err error) {
 	logrus.WithFields(logrus.Fields{
 		"log_id":        w.logId,
 		"stack":         nil,
-		"response_body": string(b),
+		"response_body": tryGetJson(w.Header(), b),
 	}).Debug()
 	return w.ResponseWriter.Write(b)
 }
@@ -149,7 +161,7 @@ func MidDebug() gin.HandlerFunc {
 				"path":         c.Request.URL.Path,
 				"method":       c.Request.Method,
 				"header":       c.Request.Header,
-				"request_body": string(reqBody),
+				"request_body": tryGetJson(c.Request.Header, reqBody),
 				"stack":        nil,
 			}).Debug()
 			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去

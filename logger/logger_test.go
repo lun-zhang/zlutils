@@ -25,8 +25,13 @@ func TestMidDebug(t *testing.T) {
 	caller.Init("zlutils")
 	Init(Config{Level: logrus.DebugLevel})
 	router := gin.New()
-	router.Group("", MidDebug()).GET("logger", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "resp data")
+	router.Group("", MidDebug()).POST("logger", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"a": gin.H{
+				"b": "s",
+				"i": 1,
+			},
+		})
 		logrus.SetLevel(logrus.InfoLevel) //下次调用就不会输出debug日志
 	})
 	router.Run(":11114")
