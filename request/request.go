@@ -221,6 +221,7 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 			entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs)).WithError(err).Error()
 			return
 		}
+		entry.Debug() //出错后会打err，因此不出错打debug
 		return nil
 	} else {
 		err = fmt.Errorf("StatusCode %d != 200", resp.StatusCode)
@@ -228,5 +229,4 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 		entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs)).WithError(err).Error()
 		return
 	}
-	entry.Debug() //出错后会打err，因此不出错打debug
 }
