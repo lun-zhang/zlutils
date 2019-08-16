@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/request"
+	"zlutils/request"
 )
 
 type Operator struct {

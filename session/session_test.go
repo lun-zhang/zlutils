@@ -5,9 +5,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/logger"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/request"
 	"zlutils/code"
+	"zlutils/logger"
+	"zlutils/request"
 )
 
 func TestMidUser(t *testing.T) {
