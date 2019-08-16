@@ -148,6 +148,9 @@ func SendClientErrHeader(c *gin.Context, data interface{}, err error) {
 func SendServerErrPanic(c *gin.Context, data interface{}, err error) {
 	Send(c, data, ServerErrPainc.WithError(err))
 }
+func SendServerErrRpc(c *gin.Context, data interface{}, err error) {
+	Send(c, data, ServerErrRpc.WithError(err))
+}
 
 /*
 ret统一，方便prometheus统计

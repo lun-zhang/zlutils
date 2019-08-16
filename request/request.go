@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 	"zlutils/guard"
 	zt "zlutils/time"
@@ -158,6 +159,16 @@ func (m RespRet) Check() error {
 	return nil
 }
 
+//从logger里复制过来的
+func tryGetJson(header http.Header, b []byte) (resp interface{}) {
+	if strings.Contains(header.Get("Content-Type"), "application/json") {
+		if er := json.Unmarshal(b, &resp); er == nil {
+			return
+		}
+	}
+	return string(b) //FIXME: 不会用非打印字符吧
+}
+
 func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
 	entry := logrus.WithField("m", m)
@@ -189,27 +200,33 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 		entry.WithError(err).Error()
 		return
 	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		//影响性能，所以只有debug下才执行
+		//另外在发生错误的时候也要执行
+		entry = entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs))
+	}
 	entry = entry.WithFields(logrus.Fields{
-		"response_body": string(respBodyBs),
-		"StatusCode":    resp.StatusCode,
+		"response_header": resp.Header,
+		"StatusCode":      resp.StatusCode,
 	})
-	entry.Debug()
 
 	if resp.StatusCode == http.StatusOK {
 		if err = json.Unmarshal(respBodyBs, &respBody); err != nil {
-			entry.WithError(err).Error()
+			entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs)).WithError(err).Error()
 			return
 		}
 		if err = respBody.Check(); err != nil { //NOTE: ret!=0或者result!=ok等自定义的错误码
 			//err = code.ServerErrRpc.WithError(err)
-			entry.WithError(err).Error()
+			entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs)).WithError(err).Error()
 			return
 		}
 		return nil
 	} else {
 		err = fmt.Errorf("StatusCode %d != 200", resp.StatusCode)
 		//err = code.ServerErrRpc.WithError(err)
-		entry.WithError(err).Error()
+		entry.WithField("response_body", tryGetJson(resp.Header, respBodyBs)).WithError(err).Error()
 		return
 	}
+	entry.Debug() //出错后会打err，因此不出错打debug
 }

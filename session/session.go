@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/request"
 )
 
 type Operator struct {
@@ -56,6 +57,20 @@ type User struct {
 	VersionCode    int    `json:"version_code"`
 }
 
+//发生变化后重设UserIdentity
+func (user *User) refreshUserIdentity() {
+	switch user.ProductId {
+	case ProductIdVClip:
+		user.UserIdentity = user.DeviceId //NOTE: vclip以device_id为唯一身份
+	case ProductIdVideoBuddy:
+		if user.UserId != "" {
+			user.UserIdentity = user.UserId //NOTE: videoBuddy优先user-id为唯一标志
+		} else {
+			user.UserIdentity = user.DeviceId
+		}
+	}
+}
+
 //NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
 func GetOperator(c *gin.Context) Operator {
 	return c.Value(KeyOperator).(Operator)
@@ -67,7 +82,7 @@ func GetUser(c *gin.Context) User {
 
 const (
 	ProductIdVideoBuddy = 39
-	ProductIdVclip      = 45
+	ProductIdVClip      = 45
 )
 
 //FIXME 感觉这个不是公用的，不改放这里
@@ -85,26 +100,20 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 			}
 			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
 			switch user.ProductId {
-			case ProductIdVclip:
+			case ProductIdVClip:
 				if user.DeviceId == "" { //NOTE: vclip一定有Device-Id，可能没有User-Id
 					err = fmt.Errorf("Device-Id is empty")
 					return
 				}
-				user.UserIdentity = user.DeviceId //NOTE: vclip以device_id为唯一身份
 			case ProductIdVideoBuddy:
 				if user.UserId == "" && user.DeviceId == "" {
 					err = fmt.Errorf("User-Id and Device-Id are empty")
 					return
 				}
-				//TODO VideoBuddy绑定关系
-				if user.UserId != "" {
-					user.UserIdentity = user.UserId //NOTE: videoBuddy优先user-id为唯一标志
-				} else {
-					user.UserIdentity = user.DeviceId
-				}
 			default:
 				//TODO 后续增加新类型
 			}
+			user.refreshUserIdentity()
 			return
 		}(c)
 		if err != nil {
@@ -116,6 +125,48 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		c.Set(KeyUser, user)
+	}
+}
+
+//调用此中间件前必须调用MidUser中间件，否则panic，应当在测试时候排查
+//或者自行设置user，但须保证UserId和DeviceId不同时为空
+//与MidUser分离的目的是，如果不满意MidUser的实现，可以自行实现，并且还能用这个绑定中间件
+func MidBindUserVideoBuddy(bind request.Config, sendServerErrRpc sendFunc) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user := GetUser(c)
+		if user.ProductId != ProductIdVideoBuddy {
+			return //只绑定vb的
+		}
+		var resp struct {
+			request.RespRet
+			Data struct {
+				WasBound bool   `json:"was_bound"`
+				UserId   string `json:"user_id"`
+				DeviceId string `json:"device_id"`
+			} `json:"data"`
+		}
+		req := request.Request{
+			Config: bind,
+		}
+		if user.UserId != "" {
+			req.AddQuery("user_id", user.UserId)
+		}
+		if user.DeviceId != "" {
+			req.AddQuery("device_id", user.DeviceId)
+		}
+		if err := req.Do(c.Request.Context(), &resp); err != nil {
+			if sendServerErrRpc != nil {
+				sendServerErrRpc(c, nil, fmt.Errorf("bind user failed"))
+			} else {
+				c.JSON(http.StatusInternalServerError, nil)
+			}
+			c.Abort()
+			return
+		}
+		user.UserId = resp.Data.UserId
+		user.DeviceId = resp.Data.DeviceId
+		user.refreshUserIdentity()
 		c.Set(KeyUser, user)
 	}
 }
