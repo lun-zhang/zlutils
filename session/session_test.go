@@ -13,7 +13,8 @@ import (
 func TestMidUser(t *testing.T) {
 	router := gin.New()
 	router.Group("user/default", MidUser(nil)).GET("", u)
-	router.Group("user/code", MidUser(code.SendClientErrHeader)).GET("", u)
+	router.Group("user/code", code.MidRespWithErr(true),
+		MidUser(code.SendClientErrHeader)).GET("", u)
 	router.Run(":11115")
 }
 func u(c *gin.Context) {

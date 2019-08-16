@@ -61,10 +61,10 @@ type User struct {
 func (user *User) refreshUserIdentity() {
 	switch user.ProductId {
 	case ProductIdVClip:
-		user.UserIdentity = user.DeviceId //NOTE: vclip以device_id为唯一身份
+		user.UserIdentity = user.UserId //VClip用UserId，因为DeviceId会发生变化
 	case ProductIdVideoBuddy:
 		if user.UserId != "" {
-			user.UserIdentity = user.UserId //NOTE: videoBuddy优先user-id为唯一标志
+			user.UserIdentity = user.UserId
 		} else {
 			user.UserIdentity = user.DeviceId
 		}
@@ -88,34 +88,29 @@ const (
 //FIXME 感觉这个不是公用的，不改放这里
 func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		user, err := func(c *gin.Context) (user User, err error) {
-			header := c.Request.Header
-			vc, _ := strconv.Atoi(header.Get("Version-Code"))
-			user = User{
-				//FIXME 从token中获得用户信息，兼容新token
-				UserId:         header.Get("User-Id"),
-				DeviceId:       header.Get("Device-Id"),
-				AcceptLanguage: header.Get("Accept-Language"),
-				VersionCode:    vc,
+		var err error
+		header := c.Request.Header
+		vc, _ := strconv.Atoi(header.Get("Version-Code"))
+		user := User{
+			//FIXME 从token中获得用户信息，兼容新token
+			UserId:         header.Get("User-Id"),
+			DeviceId:       header.Get("Device-Id"),
+			AcceptLanguage: header.Get("Accept-Language"),
+			VersionCode:    vc,
+		}
+		user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
+		switch user.ProductId {
+		case ProductIdVClip:
+			if user.UserId == "" {
+				err = fmt.Errorf("User-Id is empty") //vclip以UserId为主，所以必须有
 			}
-			user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
-			switch user.ProductId {
-			case ProductIdVClip:
-				if user.DeviceId == "" { //NOTE: vclip一定有Device-Id，可能没有User-Id
-					err = fmt.Errorf("Device-Id is empty")
-					return
-				}
-			case ProductIdVideoBuddy:
-				if user.UserId == "" && user.DeviceId == "" {
-					err = fmt.Errorf("User-Id and Device-Id are empty")
-					return
-				}
-			default:
-				//TODO 后续增加新类型
+		case ProductIdVideoBuddy:
+			if user.UserId == "" && user.DeviceId == "" {
+				err = fmt.Errorf("User-Id and Device-Id are empty")
 			}
-			user.refreshUserIdentity()
-			return
-		}(c)
+		default:
+			//TODO 后续增加新类型
+		}
 		if err != nil {
 			if sendClientErrHeader != nil {
 				sendClientErrHeader(c, nil, fmt.Errorf("invalid user, %s", err.Error()))
@@ -123,9 +118,10 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, nil)
 			}
 			c.Abort()
-			return
+		} else {
+			user.refreshUserIdentity()
+			c.Set(KeyUser, user)
 		}
-		c.Set(KeyUser, user)
 	}
 }
 
