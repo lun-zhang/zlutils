@@ -3,6 +3,8 @@ package time
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/go-playground/validator"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -32,4 +34,20 @@ func TestDuration(t *testing.T) {
 
 func TestGetIndianZeroUTC(t *testing.T) {
 	fmt.Println(GetIndianZeroUTC(time.Now()))
+}
+
+//自定义类型，如何让标签有效
+func TestValiDuration(t *testing.T) {
+	va := validator.New()
+	va.RegisterCustomTypeFunc(func(field reflect.Value) interface{} {
+		d, ok := field.Interface().(Duration)
+		fmt.Println(d, ok)
+		return d.Duration
+	}, Duration{})
+
+	var s struct {
+		D Duration `validate:"min=2"`
+	}
+	s.D.Duration = 1
+	fmt.Println(va.Struct(s))
 }

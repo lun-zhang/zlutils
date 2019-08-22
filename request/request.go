@@ -23,8 +23,8 @@ type MSI map[string]interface{}
 
 //用于consul配置
 type Config struct {
-	Method string        `json:"method"`
-	Url    string        `json:"url"`
+	Method string        `json:"method" validate:"oneof= GET POST PUT DELETE"`
+	Url    string        `json:"url" validate:"url"`
 	Client *ClientConfig `json:"client"`
 }
 

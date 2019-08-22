@@ -3,6 +3,7 @@ package request
 import (
 	"context"
 	"fmt"
+	"github.com/go-playground/validator"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
@@ -83,4 +84,27 @@ func TestReqGet(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Printf("%+v\n", respBody)
+}
+
+func TestVali(t *testing.T) {
+	fmt.Println("1", validator.New().Struct(Config{}))
+	fmt.Println("2", validator.New().Struct(Config{
+		Method: "get",
+		//Url:"http://a.com",
+	}))
+	fmt.Println("3", validator.New().Struct(Config{
+		Method: "get",
+		Url:    "http://a.com",
+	}))
+	fmt.Println("4", validator.New().Struct(Config{
+		Method: "GET",
+	}))
+	fmt.Println("5", validator.New().Struct(Config{
+		Method: "GET",
+		Url:    "abc",
+	}))
+	fmt.Println("6", validator.New().Struct(Config{
+		Method: "GET",
+		Url:    "http://a.com?a=1&b=c=a",
+	}))
 }
