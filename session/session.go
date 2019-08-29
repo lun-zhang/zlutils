@@ -62,7 +62,7 @@ func (user *User) refreshUserIdentity() {
 	switch user.ProductId {
 	case ProductIdVClip:
 		user.UserIdentity = user.UserId //VClip用UserId，因为DeviceId会发生变化
-	case ProductIdVideoBuddy:
+	default: //默认按videobuddy来
 		if user.UserId != "" {
 			user.UserIdentity = user.UserId
 		} else {
