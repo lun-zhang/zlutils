@@ -3,9 +3,11 @@ package consul
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
 	"github.com/sirupsen/logrus"
+	"net/http"
 	"reflect"
 )
 
@@ -28,12 +30,15 @@ func GetValue(key string) (value []byte) {
 	return pair.Value
 }
 
+var kv = map[string]reflect.Value{}
+
 func GetJson(key string, i interface{}) {
 	value := GetValue(key)
 	if err := json.Unmarshal(value, i); err != nil {
 		logrus.WithError(err).WithField(key, string(value)).Fatal("consul value invalid")
 	}
 	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(i).Elem())).Info("consul value ok")
+	kv[key] = reflect.ValueOf(i)
 }
 
 func WatchJson(key string, i interface{}, handler func()) {
@@ -76,4 +81,22 @@ func Init(address string, prefix string) {
 	KV = consulClient.KV()
 	Catalog = consulClient.Catalog()
 	entry.Info("consul connect ok")
+}
+
+func InitGroup(group *gin.RouterGroup) {
+	for k, v := range kv {
+		config := group.Group("consul/kv")
+		config.GET(k, func(c *gin.Context) {
+			c.JSON(http.StatusOK, v.Interface())
+		})
+		config.PUT(k, func(c *gin.Context) {
+			reqBodyPtr := v.Interface()
+			if err := c.ShouldBindJSON(reqBodyPtr); err != nil {
+				c.JSON(http.StatusBadRequest, err.Error())
+				return
+			}
+			v.Elem().Set(reflect.ValueOf(reqBodyPtr).Elem())
+			c.JSON(http.StatusOK, v.Interface())
+		})
+	}
 }
