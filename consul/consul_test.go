@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"testing"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/logger"
 	"zlutils/time"
 )
 
@@ -32,7 +33,9 @@ func TestGroup(t *testing.T) {
 	var a struct {
 		I int `json:"i" validate:"min=2" binding:"min=2"`
 	}
+	var log logger.Config
 	GetJson("a", &a)
+	GetJson("log", &log)
 
 	r := gin.New()
 	admin := r.Group("admin")

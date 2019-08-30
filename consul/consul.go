@@ -86,17 +86,21 @@ func Init(address string, prefix string) {
 func InitGroup(group *gin.RouterGroup) {
 	for k, v := range kv {
 		config := group.Group("consul/kv")
-		config.GET(k, func(c *gin.Context) {
-			c.JSON(http.StatusOK, v.Interface())
-		})
-		config.PUT(k, func(c *gin.Context) {
-			reqBodyPtr := v.Interface()
-			if err := c.ShouldBindJSON(reqBodyPtr); err != nil {
-				c.JSON(http.StatusBadRequest, err.Error())
-				return
+		config.GET(k, func(v reflect.Value) gin.HandlerFunc {
+			return func(c *gin.Context) {
+				c.JSON(http.StatusOK, v.Interface())
 			}
-			v.Elem().Set(reflect.ValueOf(reqBodyPtr).Elem())
-			c.JSON(http.StatusOK, v.Interface())
-		})
+		}(v))
+		config.PUT(k, func(v reflect.Value) gin.HandlerFunc {
+			return func(c *gin.Context) {
+				reqBodyPtr := v.Interface()
+				if err := c.ShouldBindJSON(reqBodyPtr); err != nil {
+					c.JSON(http.StatusBadRequest, err.Error())
+					return
+				}
+				v.Elem().Set(reflect.ValueOf(reqBodyPtr).Elem())
+				c.JSON(http.StatusOK, v.Interface())
+			}
+		}(v))
 	}
 }
