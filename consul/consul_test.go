@@ -36,6 +36,8 @@ func TestGroup(t *testing.T) {
 	var log logger.Config
 	GetJson("a", &a)
 	GetJson("log", &log)
+	var m map[string]struct{}
+	GetJson("m", &m)
 
 	r := gin.New()
 	admin := r.Group("admin")

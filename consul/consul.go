@@ -93,7 +93,7 @@ func InitGroup(group *gin.RouterGroup) {
 		}(v))
 		config.PUT(k, func(v reflect.Value) gin.HandlerFunc {
 			return func(c *gin.Context) {
-				reqBodyPtr := v.Interface()
+				reqBodyPtr := reflect.New(v.Elem().Type()).Interface() //创建一个空的
 				if err := c.ShouldBindJSON(reqBodyPtr); err != nil {
 					c.JSON(http.StatusBadRequest, err.Error())
 					return
