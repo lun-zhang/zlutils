@@ -11,7 +11,6 @@ require (
 	github.com/gosexy/to v0.0.0-20141221203644-c20e083e3123
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
-	github.com/lestrrat/go-strftime v0.0.0-20180220042222-ba3bf9c1d042 // indirect
 	github.com/lun-zhang/gorm v1.11.2
 	github.com/prometheus/client_golang v0.9.3
 	github.com/sirupsen/logrus v1.4.2

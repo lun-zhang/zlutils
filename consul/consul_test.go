@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"testing"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/logger"
+	"zlutils/logger"
 	"zlutils/time"
 )
 
