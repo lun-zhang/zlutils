@@ -137,7 +137,7 @@ func (m Request) GetRequest() (request *http.Request, err error) {
 	entry.WithFields(logrus.Fields{
 		"request_url":    request.URL.String(),
 		"request_header": request.Header,
-		"request_body":   string(reqBodyBs),
+		"request_body":   m.Body,
 	}).Debug()
 	return
 }
