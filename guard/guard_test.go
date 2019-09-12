@@ -40,6 +40,7 @@ func TestMetric(t *testing.T) {
 	go func() {
 		for {
 			f3()
+			time.Sleep(time.Second)
 		}
 	}()
 	router.Run(":11120")

@@ -58,6 +58,9 @@ func BeforeCtx(ctxp *context.Context) AfterFunc {
 	start := time.Now()
 	name := caller.Caller(2)
 	args := DoBeforeCtx(ctxp)
+	if MetricUnderway != nil {
+		MetricUnderway(name).Inc()
+	}
 	return func() AfterFunc {
 		return func(errp *error) {
 			var err error
@@ -77,6 +80,9 @@ func BeforeCtx(ctxp *context.Context) AfterFunc {
 			}
 			if MetricLatency != nil {
 				MetricLatency(name).Observe(time.Now().Sub(start).Seconds() * 1000)
+			}
+			if MetricUnderway != nil {
+				MetricUnderway(name).Dec()
 			}
 			DoAfter(err, args...) //即使errp==nil，也把panic的err传入
 		}

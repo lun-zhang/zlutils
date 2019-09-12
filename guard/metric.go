@@ -7,6 +7,13 @@ import (
 )
 
 func InitDefaultMetric(projectName string) {
+	defaultUnderway := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: fmt.Sprintf("%s_func_underway", projectName),
+			Help: "Underway Func counts",
+		},
+		[]string{"func"},
+	)
 	defaultCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_func_total", projectName),
@@ -25,6 +32,7 @@ func InitDefaultMetric(projectName string) {
 	prometheus.MustRegister(
 		defaultCounter,
 		defaultLatency,
+		defaultUnderway,
 	)
 	//TODO: 是否需要把函数返回的err带上？
 	MetricCounter = func(name string) prometheus.Counter {
@@ -33,12 +41,13 @@ func InitDefaultMetric(projectName string) {
 	MetricLatency = func(name string) prometheus.Observer {
 		return defaultLatency.WithLabelValues(name)
 	}
+	MetricUnderway = func(name string) prometheus.Gauge {
+		return defaultUnderway.WithLabelValues(name)
+	}
 }
 
-type fnc func(name string) prometheus.Counter
-type fno func(name string) prometheus.Observer
-
 var (
-	MetricCounter fnc
-	MetricLatency fno
+	MetricCounter  func(name string) prometheus.Counter
+	MetricLatency  func(name string) prometheus.Observer
+	MetricUnderway func(name string) prometheus.Gauge
 )
