@@ -67,6 +67,13 @@ func Wrap(f HandelFunc) gin.HandlerFunc {
 	}
 }
 
+func WrapSend(f func(c *gin.Context) (resp interface{}, err error)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		resp, err := f(c)
+		Send(c, resp, err)
+	}
+}
+
 const keyRespWithErr = "_key_resp_show_err"
 
 //使用此中间件的接口，输出带上err信息

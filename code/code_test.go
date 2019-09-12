@@ -45,6 +45,36 @@ func e(c *gin.Context) {
 	Send(c, 1, fmt.Errorf("e"))
 }
 
+func ew(c *gin.Context) (resp interface{}, err error) {
+	var reqQuery struct {
+		I int `form:"i"`
+	}
+	if err = c.ShouldBindQuery(&reqQuery); err != nil {
+		err = ClientErrQuery.WithError(err)
+		return
+	}
+	return do(reqQuery.I)
+}
+
+var clientErrI0 = Add(4101, "i is 0")
+
+func do(i int) (resp struct {
+	I int
+}, err error) {
+	if i == 0 {
+		err = clientErrI0.WithErrorf("i=0")
+		return
+	}
+	resp.I = i
+	return
+}
+
+func TestWrapSend(t *testing.T) {
+	router := gin.New()
+	router.Group("", MidRespWithErr(false)).GET("we", WrapSend(ew))
+	router.Run(":11124")
+}
+
 func TestMidRespWithErr(t *testing.T) {
 	gin.SetMode(gin.ReleaseMode) //这一行注释掉后，app会带上err信息
 	router := gin.New()
