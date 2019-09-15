@@ -1,8 +1,10 @@
 package code
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"net/http"
 	"testing"
 	"zlutils/caller"
 	"zlutils/logger"
@@ -23,13 +25,16 @@ func TestWrapApi(t *testing.T) {
 
 func api(req struct {
 	Body struct {
-		B int `json:"b"`
+		B int `json:"b" binding:"required"`
 	}
 	Uri struct {
-		U int `uri:"u"`
+		U int `uri:"u" binding:"required"`
 	}
 	Query struct {
-		Q int `form:"q"`
+		Q int `form:"q" binding:"required"`
+	}
+	Header struct {
+		H int `header:"h" binding:"required"`
 	}
 }) (resp struct {
 	R interface{} `json:"r"`
@@ -59,4 +64,26 @@ func TestWrapApiErr3(t *testing.T) {
 
 func TestWrapApiErr4(t *testing.T) {
 	WrapApi(1)
+}
+
+func TestBindHeader(t *testing.T) {
+	header := http.Header{}
+	header.Add("S", "s")
+	header.Add("I", "1")
+	header.Add("J", "1")
+	header.Add("f", "1.1")
+	header.Add("a-b", "1") //被转成大写A-B
+
+	var reqHeader struct {
+		S  string  `header:"s"`
+		I  int     `header:"-"` //忽略
+		J  int     //没tag时候，名字为J
+		F  float32 `header:"f"`
+		AB int     `header:"A-B"`
+		//No int `header:"no" binding:"required"`//检验
+	}
+	if err := bindHeader(header, &reqHeader); err != nil {
+		fmt.Println(err) //如果失败，则reqHeader会被置零
+	}
+	fmt.Printf("%+v\n", reqHeader)
 }
