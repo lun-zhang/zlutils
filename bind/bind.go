@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"zlutils/caller"
 	"zlutils/code"
 )
 
@@ -13,8 +14,9 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
 	entry := logrus.WithFields(logrus.Fields{
-		"ft": fmt.Sprintf("%s", ft),
-		"fv": fmt.Sprintf("%s", fv),
+		"ft":     fmt.Sprintf("%s", ft),
+		"fv":     fmt.Sprintf("%s", fv),
+		"caller": caller.Caller(2),
 	})
 
 	if ft.Kind() != reflect.Func { //api必须是函数
