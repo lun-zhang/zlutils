@@ -1,6 +1,7 @@
 package code
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -30,16 +31,21 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 
 	errType := ft.Out(1)
 	if _, ok := reflect.New(errType).Interface().(*error); !ok { //第二个出参必须是error类型
-		entry.Fatalf("out[2] type:%s isn't error", errType.Name())
+		entry.Fatalf("out(1) type:%s isn't error", errType.Name())
+	}
+	numIn := ft.NumIn()
+	if numIn != 1 && numIn != 2 { //入参只能是(ctx)或(ctx,req)
+		entry.Fatalf("numIn:%d isn't 1 or 2", numIn)
+	}
+	ctxType := ft.In(0)
+	if _, ok := reflect.New(ctxType).Interface().(*context.Context); !ok { //第1个入参必须是context类型
+		entry.Fatalf("in(0) type:%s isn't context", ctxType.Name())
 	}
 
 	var reqValue reflect.Value
 	var reqFieldMap map[string]reflect.Type
-	if ft.NumIn() > 0 {
-		if ft.NumIn() != 1 { //入参如果有就必须为1个
-			entry.Fatalf("ft.NumIn():%d isn't 0 or 1", ft.NumIn())
-		}
-		reqType := ft.In(0)
+	if numIn == 2 {
+		reqType := ft.In(1)
 		if reqType.Kind() != reflect.Struct {
 			entry.Fatalf("req kind:%s isn't struct", reqType.Kind())
 		}
@@ -92,6 +98,7 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 
 		//响应
 		var in []reflect.Value
+		in = append(in, reflect.ValueOf(c.Request.Context()))
 		if reqValue.IsValid() { //如果有入参
 			in = append(in, reqValue)
 		}
