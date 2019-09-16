@@ -1,7 +1,6 @@
 package code
 
 import (
-	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -24,7 +23,7 @@ func TestWrapApi(t *testing.T) {
 	router.Run(":11150")
 }
 
-func api(ctx context.Context, req struct {
+func api(c *gin.Context, req struct {
 	Body struct {
 		B int `json:"b" binding:"required"`
 	}
@@ -40,14 +39,13 @@ func api(ctx context.Context, req struct {
 }) (resp struct {
 	R interface{} `json:"r"`
 }, err error) {
-	d, ok := ctx.Deadline()
-	fmt.Println(d, ok, ctx.Err())
+	fmt.Println(c.Keys)
 	resp.R = req
 	return
 	//return resp,fmt.Errorf("e")
 }
 
-func noReq(ctx context.Context) (resp interface{}, err error) {
+func noReq(c *gin.Context) (resp interface{}, err error) {
 	return 1, nil
 }
 

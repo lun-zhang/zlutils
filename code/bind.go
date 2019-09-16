@@ -1,7 +1,6 @@
 package code
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -38,8 +37,8 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("numIn:%d isn't 1 or 2", numIn)
 	}
 	ctxType := ft.In(0)
-	if _, ok := reflect.New(ctxType).Interface().(*context.Context); !ok { //第1个入参必须是context类型
-		entry.Fatalf("in(0) type:%s isn't context", ctxType.Name())
+	if _, ok := reflect.New(ctxType).Interface().(**gin.Context); !ok { //第1个入参必须是context类型
+		entry.Fatalf("in(0) type:%s isn't *gin.Context", ctxType.Name())
 	}
 
 	var reqValue reflect.Value
@@ -98,7 +97,7 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 
 		//响应
 		var in []reflect.Value
-		in = append(in, reflect.ValueOf(c.Request.Context()))
+		in = append(in, reflect.ValueOf(c))
 		if reqValue.IsValid() { //如果有入参
 			in = append(in, reqValue)
 		}
