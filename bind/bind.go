@@ -9,7 +9,7 @@ import (
 	"zlutils/code"
 )
 
-func WrapApi(api interface{}) gin.HandlerFunc {
+func Wrap(api interface{}) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
 	entry := logrus.WithFields(logrus.Fields{

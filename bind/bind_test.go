@@ -16,13 +16,13 @@ func init() {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
 }
 
-func TestWrapApi(t *testing.T) {
+func TestWrap(t *testing.T) {
 	router := gin.New()
 	base := router.Group("", code.MidRespWithErr(false))
 	base.Group("", func(c *gin.Context) {
 		c.Set("a", 1)
-	}).POST("api/:u", WrapApi(api))
-	base.GET("no_req", WrapApi(noReq))
+	}).POST("api/:u", Wrap(api))
+	base.GET("no_req", Wrap(noReq))
 	router.Run(":11150")
 }
 
@@ -57,19 +57,19 @@ func noReq(ctx context.Context) (resp interface{}, err error) {
 }
 
 func TestWrapApiErr0(t *testing.T) {
-	WrapApi(func() {})
+	Wrap(func() {})
 }
 func TestWrapApiErr1(t *testing.T) {
-	WrapApi(func(req int) (interface{}, error) { return nil, nil })
+	Wrap(func(req int) (interface{}, error) { return nil, nil })
 }
 func TestWrapApiErr2(t *testing.T) {
-	WrapApi(func(req, req2 int) (interface{}, error) { return nil, nil })
+	Wrap(func(req, req2 int) (interface{}, error) { return nil, nil })
 }
 
 func TestWrapApiErr3(t *testing.T) {
-	WrapApi(func() (interface{}, int) { return nil, 1 })
+	Wrap(func() (interface{}, int) { return nil, 1 })
 }
 
 func TestWrapApiErr4(t *testing.T) {
-	WrapApi(1)
+	Wrap(1)
 }
