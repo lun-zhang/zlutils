@@ -1,12 +1,15 @@
 package session
 
 import (
+	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"zlutils/code"
 	"zlutils/logger"
+	"zlutils/meta"
 	"zlutils/request"
 )
 
@@ -15,6 +18,18 @@ func TestMidUser(t *testing.T) {
 	router.Group("user/default", MidUser(nil)).GET("", u)
 	router.Group("user/code", code.MidRespWithErr(true),
 		MidUser(code.SendClientErrHeader)).GET("", u)
+	router.Group("", code.MidRespWithErr(true),
+		MidUser(code.SendClientErrHeader)).GET("user/meta", code.WrapApi(func(ctx context.Context, req struct {
+		Header struct {
+			UserId   string `header:"User-Id" binding:"required"`
+			DeviceId string `header:"Device-Id" binding:"required"`
+		}
+		Meta meta.Meta
+	}) (resp interface{}, err error) {
+		resp = req
+		fmt.Printf("%+v\n", MetaGetUser(req.Meta))
+		return
+	}))
 	router.Run(":11115")
 }
 func u(c *gin.Context) {

@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"zlutils/meta"
 	"zlutils/request"
 )
 
@@ -73,11 +74,17 @@ func (user *User) refreshUserIdentity() {
 
 //NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
 func GetOperator(c *gin.Context) Operator {
-	return c.Value(KeyOperator).(Operator)
+	return MetaGetOperator(c.Keys)
+}
+func MetaGetOperator(m meta.Meta) Operator {
+	return m.MustGet(KeyOperator).(Operator)
 }
 
 func GetUser(c *gin.Context) User {
-	return c.Value(KeyUser).(User)
+	return MetaGetUser(c.Keys)
+}
+func MetaGetUser(m meta.Meta) User {
+	return m.MustGet(KeyUser).(User)
 }
 
 const (
