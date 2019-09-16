@@ -81,7 +81,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		if bodyType, ok := reqFieldMap[ReqFieldNameBody]; ok {
 			bodyPtr := reflect.New(bodyType).Interface()
 			if err := c.ShouldBindJSON(bodyPtr); err != nil {
-				Send(c, nil, ClientErrBody.WithError(err))
+				code.Send(c, nil, code.ClientErrBody.WithError(err))
 				c.Abort()
 				return
 			}
@@ -90,7 +90,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		if queryType, ok := reqFieldMap[ReqFieldNameQuery]; ok {
 			queryPtr := reflect.New(queryType).Interface()
 			if err := c.ShouldBindQuery(queryPtr); err != nil {
-				Send(c, nil, ClientErrQuery.WithError(err))
+				code.Send(c, nil, code.ClientErrQuery.WithError(err))
 				c.Abort()
 				return
 			}
@@ -99,7 +99,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		if uriType, ok := reqFieldMap[ReqFieldNameUri]; ok {
 			uriPtr := reflect.New(uriType).Interface()
 			if err := c.ShouldBindUri(uriPtr); err != nil {
-				Send(c, nil, ClientErrUri.WithError(err))
+				code.Send(c, nil, code.ClientErrUri.WithError(err))
 				c.Abort()
 				return
 			}
@@ -108,7 +108,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		if headerType, ok := reqFieldMap[ReqFieldNameHeader]; ok {
 			headerPtr := reflect.New(headerType).Interface()
 			if err := ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
-				Send(c, nil, ClientErrHeader.WithError(err))
+				code.Send(c, nil, code.ClientErrHeader.WithError(err))
 				c.Abort()
 				return
 			}
@@ -144,7 +144,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 				err = out[1].Interface().(error)
 			}
 		}
-		Send(c, resp, err)
+		code.Send(c, resp, err)
 	}
 }
 
@@ -155,13 +155,4 @@ var (
 	ReqFieldNameUri    = "Uri"
 	ReqFieldNameHeader = "Header"
 	ReqFieldNameMeta   = "Meta"
-)
-
-//允许用户自定义
-var Send = code.Send
-var (
-	ClientErrHeader = code.ClientErrHeader
-	ClientErrUri    = code.ClientErrUri
-	ClientErrQuery  = code.ClientErrQuery
-	ClientErrBody   = code.ClientErrBody
 )
