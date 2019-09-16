@@ -5,20 +5,16 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"net/http"
 	"time"
 	"zlutils/caller"
+	"zlutils/code"
 )
 
-func Mid(sendServerErrPanic func(c *gin.Context, data interface{}, err error)) gin.HandlerFunc {
+func Mid() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				if sendServerErrPanic != nil {
-					sendServerErrPanic(c, nil, fmt.Errorf("panic: %+v", rec)) //用户自定义处理
-				} else {
-					c.JSON(http.StatusInternalServerError, nil) //默认返回500
-				}
+				code.Send(c, nil, code.ServerErrPainc.WithErrorf("panic: %+v", rec))
 			}
 		}()
 		c.Next()

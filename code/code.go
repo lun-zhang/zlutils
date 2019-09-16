@@ -146,19 +146,6 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 	})
 }
 
-func SendClientErrQuery(c *gin.Context, data interface{}, err error) {
-	Send(c, data, ClientErrQuery.WithError(err))
-}
-func SendClientErrHeader(c *gin.Context, data interface{}, err error) {
-	Send(c, data, ClientErrHeader.WithError(err))
-}
-func SendServerErrPanic(c *gin.Context, data interface{}, err error) {
-	Send(c, data, ServerErrPainc.WithError(err))
-}
-func SendServerErrRpc(c *gin.Context, data interface{}, err error) {
-	Send(c, data, ServerErrRpc.WithError(err))
-}
-
 /*
 ret统一，方便prometheus统计
 正确:			0

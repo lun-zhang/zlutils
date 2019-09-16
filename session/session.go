@@ -3,8 +3,8 @@ package session
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"strconv"
+	"zlutils/code"
 	"zlutils/meta"
 	"zlutils/request"
 )
@@ -20,9 +20,7 @@ const (
 	KeyUser     = "_key_user"
 )
 
-type sendFunc func(c *gin.Context, data interface{}, err error)
-
-func MidOperator(sendClientErrQuery sendFunc) gin.HandlerFunc {
+func MidOperator() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		operator, err := func(c *gin.Context) (operator Operator, err error) {
 			if err = c.ShouldBindQuery(&operator); err != nil {
@@ -37,11 +35,7 @@ func MidOperator(sendClientErrQuery sendFunc) gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
-			if sendClientErrQuery != nil {
-				sendClientErrQuery(c, nil, fmt.Errorf("invalid operator, err:%s", err.Error()))
-			} else {
-				c.JSON(http.StatusBadRequest, nil)
-			}
+			code.Send(c, nil, code.ClientErrQuery.WithErrorf("invalid operator, err:%s", err.Error()))
 			c.Abort()
 			return
 		}
@@ -93,7 +87,7 @@ const (
 )
 
 //FIXME 感觉这个不是公用的，不改放这里
-func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
+func MidUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var err error
 		header := c.Request.Header
@@ -119,11 +113,7 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 			//TODO 后续增加新类型
 		}
 		if err != nil {
-			if sendClientErrHeader != nil {
-				sendClientErrHeader(c, nil, fmt.Errorf("invalid user, %s", err.Error()))
-			} else {
-				c.JSON(http.StatusBadRequest, nil)
-			}
+			code.Send(c, nil, code.ClientErrHeader.WithErrorf("invalid user, %s", err.Error()))
 			c.Abort()
 		} else {
 			user.refreshUserIdentity()
@@ -135,7 +125,7 @@ func MidUser(sendClientErrHeader sendFunc) gin.HandlerFunc {
 //调用此中间件前必须调用MidUser中间件，否则panic，应当在测试时候排查
 //或者自行设置user，但须保证UserId和DeviceId不同时为空
 //与MidUser分离的目的是，如果不满意MidUser的实现，可以自行实现，并且还能用这个绑定中间件
-func MidBindUserVideoBuddy(bind request.Config, sendServerErrRpc sendFunc) gin.HandlerFunc {
+func MidBindUserVideoBuddy(bind request.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user := GetUser(c)
 		if user.ProductId != ProductIdVideoBuddy {
@@ -159,11 +149,7 @@ func MidBindUserVideoBuddy(bind request.Config, sendServerErrRpc sendFunc) gin.H
 			req.AddQuery("device_id", user.DeviceId)
 		}
 		if err := req.Do(c.Request.Context(), &resp); err != nil {
-			if sendServerErrRpc != nil {
-				sendServerErrRpc(c, nil, fmt.Errorf("bind user failed"))
-			} else {
-				c.JSON(http.StatusInternalServerError, nil)
-			}
+			code.Send(c, nil, code.ServerErrRpc.WithErrorf("bind user failed"))
 			c.Abort()
 			return
 		}
