@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"strconv"
 	"time"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/meta"
 )
 
 func WrapApi(api interface{}) gin.HandlerFunc {
@@ -35,8 +34,8 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("out(1) type:%s isn't error", errType.Name())
 	}
 	numIn := ft.NumIn()
-	if numIn != 1 && numIn != 3 { //入参只能是(ctx)或(ctx,req)或(ctx,meta)或(ctx,req,meta)，先简单实现1参和3参
-		entry.Fatalf("numIn:%d isn't in 1 or 3", numIn)
+	if numIn != 1 && numIn != 2 { //入参只能是(ctx)或(ctx,req)
+		entry.Fatalf("numIn:%d isn't in 1 or 2", numIn)
 	}
 
 	ctxType := ft.In(0)
@@ -46,7 +45,7 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 
 	var reqValue reflect.Value
 	var reqFieldMap map[string]reflect.Type
-	if numIn == 3 {
+	if numIn == 2 {
 		reqType := ft.In(1)
 		if reqType.Kind() != reflect.Struct {
 			entry.Fatalf("req kind:%s isn't struct", reqType.Kind())
@@ -56,6 +55,18 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 		for i := 0; i < reqType.NumField(); i++ {
 			ti := reqType.Field(i)
 			reqFieldMap[ti.Name] = ti.Type
+			if ti.Name == ReqFieldNameMeta {
+				metaType := ti.Type
+				if metaType.Kind() != reflect.Map {
+					logrus.Fatalf("metaType kind:%s isn't map", metaType.Kind())
+				}
+				if metaType.Key().Kind() != reflect.String {
+					logrus.Fatalf("metaType map key kind:%s isn't string", metaType.Key().Kind())
+				}
+				if metaType.Elem().Kind() != reflect.Interface {
+					logrus.Fatalf("metaType map value kind:%s isn't interface{}", metaType.Elem().Kind())
+				}
+			}
 		}
 	}
 
@@ -97,13 +108,15 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 			}
 			reqValue.FieldByName(ReqFieldNameHeader).Set(reflect.ValueOf(headerPtr).Elem())
 		}
+		if _, ok := reqFieldMap[ReqFieldNameMeta]; ok {
+			reqValue.FieldByName(ReqFieldNameMeta).Set(reflect.ValueOf(c.Keys))
+		}
 
 		//响应
 		var in []reflect.Value
 		in = append(in, reflect.ValueOf(c.Request.Context()))
-		if numIn == 3 {
+		if numIn == 2 {
 			in = append(in, reqValue)
-			in = append(in, reflect.ValueOf(meta.Meta(c.Keys)))
 		}
 		out := fv.Call(in)
 		var err error
@@ -115,11 +128,12 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 }
 
 var (
-	//允许用户自定义
+	//允许用户自定义(其实也可以改成tag，但是不能用FieldByName了)
 	ReqFieldNameBody   = "Body"
 	ReqFieldNameQuery  = "Query"
 	ReqFieldNameUri    = "Uri"
 	ReqFieldNameHeader = "Header"
+	ReqFieldNameMeta   = "Meta"
 )
 
 func bindHeader(header http.Header, obj interface{}) (err error) {

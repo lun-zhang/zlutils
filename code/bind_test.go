@@ -40,10 +40,14 @@ func api(ctx context.Context, req struct {
 	Header struct {
 		H int `header:"h" binding:"required"`
 	}
-}, mt meta.Meta) (resp struct {
+	Meta meta.Meta //ok
+	//Meta map[string]interface{}//ok
+	//Meta int //不是map
+	//Meta map[int]interface{}//key不是string
+	//Meta map[string]int//value不是interface{}
+}) (resp struct {
 	R interface{} `json:"r"`
 }, err error) {
-	fmt.Println(ctx.Err(), mt)
 	resp.R = req
 	return
 	//return resp,fmt.Errorf("e")
