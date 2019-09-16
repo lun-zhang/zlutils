@@ -149,27 +149,43 @@ func bindHeader(header http.Header, obj interface{}) (err error) {
 		return fmt.Errorf("obj elem:%s isn't struct", ve.Kind())
 	}
 	te := reflect.TypeOf(ve.Interface())
+	tmpVe := reflect.New(te).Elem()
 	defer func() {
-		if err != nil {
-			ve.Set(reflect.Zero(te)) //注意：发生错误时，要重置为零值，否则可能出现隐晦bug
+		if err == nil {
+			ve.Set(tmpVe) //注意：发生错误时，则不修改obj，否则可能出现隐晦bug
 		}
 	}()
-	for i := 0; i < te.NumField(); i++ {
-		ti := te.Field(i)
-		vi := ve.Field(i)
-		name := ti.Tag.Get("header")
-		if name == "-" {
-			continue
-		}
-		if name == "" { //没有tag，默认为field name
-			name = ti.Name
-		}
-		s := header.Get(name)
-		if err = setWithProperType(s, vi, ti); err != nil {
-			return
+
+	if err = bh(header, tmpVe); err != nil {
+		return
+	}
+	return binding.Validator.ValidateStruct(tmpVe.Interface())
+}
+
+func bh(header http.Header, v reflect.Value) (err error) {
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		ti := t.Field(i)
+		vi := v.Field(i)
+		if ti.Anonymous {
+			if err = bh(header, vi); err != nil {
+				return
+			}
+		} else {
+			name := ti.Tag.Get("header")
+			if name == "-" {
+				continue
+			}
+			if name == "" { //没有tag，默认为field name
+				name = ti.Name
+			}
+			s := header.Get(name)
+			if err = setWithProperType(s, vi, ti); err != nil {
+				return
+			}
 		}
 	}
-	return binding.Validator.ValidateStruct(ve.Interface())
+	return
 }
 
 //从 github.com/gin-gonic/gin@v1.4.0/binding/form_mapping.go:170 复制过来的

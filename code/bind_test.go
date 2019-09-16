@@ -89,10 +89,26 @@ func TestBindHeader(t *testing.T) {
 		J  int     //没tag时候，名字为J
 		F  float32 `header:"f"`
 		AB int     `header:"A-B"`
-		//No int `header:"no" binding:"required"`//检验
+		//No int     `header:"no" binding:"required"` //检验
 	}
+	reqHeader.S = "init" //NOTE: 发生错误时，不会被修改
 	if err := bindHeader(header, &reqHeader); err != nil {
 		fmt.Println(err) //如果失败，则reqHeader会被置零
+	}
+	fmt.Printf("%+v\n", reqHeader)
+}
+
+func TestBindHeaderNesting(t *testing.T) {
+	header := http.Header{}
+	header.Add("i", "1")
+	type I struct {
+		I int `header:"i" binding:"required"`
+	}
+	var reqHeader struct {
+		I
+	}
+	if err := bindHeader(header, &reqHeader); err != nil {
+		fmt.Println(err)
 	}
 	fmt.Printf("%+v\n", reqHeader)
 }
