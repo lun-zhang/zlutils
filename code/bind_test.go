@@ -1,11 +1,13 @@
 package code
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/meta"
 	"zlutils/caller"
 	"zlutils/logger"
 )
@@ -18,12 +20,14 @@ func init() {
 func TestWrapApi(t *testing.T) {
 	router := gin.New()
 	base := router.Group("", MidRespWithErr(false))
-	base.POST("api/:u", WrapApi(api))
+	base.Group("", func(c *gin.Context) {
+		c.Set("a", 1)
+	}).POST("api/:u", WrapApi(api))
 	base.GET("no_req", WrapApi(noReq))
 	router.Run(":11150")
 }
 
-func api(c *gin.Context, req struct {
+func api(ctx context.Context, req struct {
 	Body struct {
 		B int `json:"b" binding:"required"`
 	}
@@ -36,16 +40,16 @@ func api(c *gin.Context, req struct {
 	Header struct {
 		H int `header:"h" binding:"required"`
 	}
-}) (resp struct {
+}, mt meta.Meta) (resp struct {
 	R interface{} `json:"r"`
 }, err error) {
-	fmt.Println(c.Keys)
+	fmt.Println(ctx.Err(), mt)
 	resp.R = req
 	return
 	//return resp,fmt.Errorf("e")
 }
 
-func noReq(c *gin.Context) (resp interface{}, err error) {
+func noReq(ctx context.Context) (resp interface{}, err error) {
 	return 1, nil
 }
 

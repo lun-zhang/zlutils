@@ -1,6 +1,7 @@
 package code
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/meta"
 )
 
 func WrapApi(api interface{}) gin.HandlerFunc {
@@ -33,17 +35,18 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("out(1) type:%s isn't error", errType.Name())
 	}
 	numIn := ft.NumIn()
-	if numIn != 1 && numIn != 2 { //入参只能是(ctx)或(ctx,req)
-		entry.Fatalf("numIn:%d isn't 1 or 2", numIn)
+	if numIn != 1 && numIn != 3 { //入参只能是(ctx)或(ctx,req)或(ctx,meta)或(ctx,req,meta)，先简单实现1参和3参
+		entry.Fatalf("numIn:%d isn't in 1 or 3", numIn)
 	}
+
 	ctxType := ft.In(0)
-	if _, ok := reflect.New(ctxType).Interface().(**gin.Context); !ok { //第1个入参必须是context类型
-		entry.Fatalf("in(0) type:%s isn't *gin.Context", ctxType.Name())
+	if _, ok := reflect.New(ctxType).Interface().(*context.Context); !ok { //第1个入参必须是context类型
+		entry.Fatalf("in(0) type:%s isn't context.Context", ctxType.Name())
 	}
 
 	var reqValue reflect.Value
 	var reqFieldMap map[string]reflect.Type
-	if numIn == 2 {
+	if numIn == 3 {
 		reqType := ft.In(1)
 		if reqType.Kind() != reflect.Struct {
 			entry.Fatalf("req kind:%s isn't struct", reqType.Kind())
@@ -97,9 +100,10 @@ func WrapApi(api interface{}) gin.HandlerFunc {
 
 		//响应
 		var in []reflect.Value
-		in = append(in, reflect.ValueOf(c))
-		if reqValue.IsValid() { //如果有入参
+		in = append(in, reflect.ValueOf(c.Request.Context()))
+		if numIn == 3 {
 			in = append(in, reqValue)
+			in = append(in, reflect.ValueOf(meta.Meta(c.Keys)))
 		}
 		out := fv.Call(in)
 		var err error
