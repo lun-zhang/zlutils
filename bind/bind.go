@@ -10,6 +10,11 @@ import (
 	"zlutils/code"
 )
 
+func isErrType(t reflect.Type) (ok bool) {
+	_, ok = reflect.New(t).Interface().(*error)
+	return
+}
+
 func Wrap(api interface{}) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
@@ -23,14 +28,17 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("api kind:%s isn't func", ft.Kind())
 	}
 
-	if ft.NumOut() != 2 { //出参个数必须为2
-		entry.Fatalf("ft.NumOut():%d isn't 2", ft.NumOut())
+	numOut := ft.NumOut()
+	if numOut > 2 {
+		entry.Fatalf("numOut:%d bigger than 2", numOut)
 	}
 
-	errType := ft.Out(1)
-	if _, ok := reflect.New(errType).Interface().(*error); !ok { //第二个出参必须是error类型
-		entry.Fatalf("out(1) type:%s isn't error", errType.Name())
+	if numOut == 2 {
+		if errType := ft.Out(1); !isErrType(errType) { //第二个出参必须是error类型
+			entry.Fatalf("out(1) type:%s isn't error", errType.Name())
+		}
 	}
+
 	numIn := ft.NumIn()
 	if numIn != 1 && numIn != 2 { //入参只能是(ctx)或(ctx,req)
 		entry.Fatalf("numIn:%d isn't in 1 or 2", numIn)
@@ -117,11 +125,26 @@ func Wrap(api interface{}) gin.HandlerFunc {
 			in = append(in, reqValue)
 		}
 		out := fv.Call(in)
+
+		var resp interface{}
 		var err error
-		if !out[1].IsNil() {
-			err = out[1].Interface().(error)
+
+		switch numOut {
+		case 1: //NOTE: 返回只有一个参数的时候，如果是error类型则被认为是err，因此如果想要让返回err类型的resp时候，必须用2个返回参数(resp,err)
+			if isErrType(out[0].Type()) { //(err)
+				if !out[0].IsNil() { //nil.(error)会panic
+					err = out[0].Interface().(error)
+				}
+			} else { //(resp)
+				resp = out[0].Interface()
+			}
+		case 2: //(resp,err)
+			resp = out[0].Interface()
+			if !out[1].IsNil() {
+				err = out[1].Interface().(error)
+			}
 		}
-		Send(c, out[0].Interface(), err)
+		Send(c, resp, err)
 	}
 }
 

@@ -2,6 +2,7 @@ package bind
 
 import (
 	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"testing"
@@ -23,6 +24,11 @@ func TestWrap(t *testing.T) {
 		c.Set("a", 1)
 	}).POST("api/:u", Wrap(api))
 	base.GET("no_req", Wrap(noReq))
+	base.GET("no_resp", Wrap(noResp))
+	base.GET("resp", Wrap(resp))
+	base.GET("resp2", Wrap(resp2))
+	base.GET("err", Wrap(err))
+	base.GET("err2", Wrap(err2))
 	router.Run(":11150")
 }
 
@@ -53,8 +59,14 @@ func api(ctx context.Context, req struct {
 }
 
 func noReq(ctx context.Context) (resp interface{}, err error) {
-	return 1, nil
+	return nil, nil
 }
+
+func noResp(ctx context.Context)                   {}
+func resp(ctx context.Context) (resp interface{})  { return nil }
+func resp2(ctx context.Context) (resp interface{}) { return 1 }
+func err(ctx context.Context) (err error)          { return nil }
+func err2(ctx context.Context) (err error)         { return fmt.Errorf("eee") }
 
 func TestWrapApiErr0(t *testing.T) {
 	Wrap(func() {})
