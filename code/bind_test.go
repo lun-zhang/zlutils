@@ -7,9 +7,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/meta"
 	"zlutils/caller"
 	"zlutils/logger"
+	"zlutils/meta"
 )
 
 func init() {
