@@ -28,7 +28,7 @@ func TestGetJson(t *testing.T) {
 	fmt.Println(tmp)
 }
 
-func TestGroup(t *testing.T) {
+func TestBindRouter(t *testing.T) {
 	Init(":8500", "test/service/counter")
 	var a struct {
 		I int `json:"i" validate:"min=2" binding:"min=2"`

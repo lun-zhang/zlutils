@@ -84,8 +84,10 @@ func Init(address string, prefix string) {
 }
 
 func BindRouter(group *gin.RouterGroup) {
+	config := group.Group("consul/kv")
+	var ks []string
 	for k, v := range kv {
-		config := group.Group("consul/kv")
+		ks = append(ks, k)
 		config.GET(k, func(v reflect.Value) gin.HandlerFunc {
 			return func(c *gin.Context) {
 				c.JSON(http.StatusOK, v.Interface())
@@ -103,4 +105,7 @@ func BindRouter(group *gin.RouterGroup) {
 			}
 		}(v))
 	}
+	config.GET("", func(c *gin.Context) {
+		c.JSON(http.StatusOK, ks)
+	})
 }
