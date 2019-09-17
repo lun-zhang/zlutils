@@ -83,7 +83,7 @@ func Init(address string, prefix string) {
 	entry.Info("consul connect ok")
 }
 
-func InitGroup(group *gin.RouterGroup) {
+func BindRouter(group *gin.RouterGroup) {
 	for k, v := range kv {
 		config := group.Group("consul/kv")
 		config.GET(k, func(v reflect.Value) gin.HandlerFunc {

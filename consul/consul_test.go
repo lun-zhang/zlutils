@@ -42,6 +42,6 @@ func TestGroup(t *testing.T) {
 	r := gin.New()
 	admin := r.Group("admin")
 
-	InitGroup(admin)
+	BindRouter(admin)
 	r.Run(":11130")
 }
