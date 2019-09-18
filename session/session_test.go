@@ -7,27 +7,27 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
+	"zlutils/bind"
 	"zlutils/code"
 	"zlutils/logger"
-	"zlutils/meta"
 	"zlutils/request"
 )
 
 func TestMidUser(t *testing.T) {
 	router := gin.New()
-	router.Group("user/default", MidUser(nil)).GET("", u)
+	router.Group("user/default", MidUser()).GET("", u)
 	router.Group("user/code", code.MidRespWithErr(true),
-		MidUser(code.SendClientErrHeader)).GET("", u)
+		MidUser()).GET("", u)
 	router.Group("", code.MidRespWithErr(true),
-		MidUser(code.SendClientErrHeader)).GET("user/meta", code.WrapApi(func(ctx context.Context, req struct {
+		MidUser()).GET("user/meta", bind.Wrap(func(ctx context.Context, req struct {
 		Header struct {
 			UserId   string `header:"User-Id" binding:"required"`
 			DeviceId string `header:"Device-Id" binding:"required"`
 		}
-		Meta meta.Meta
+		Meta Meta
 	}) (resp interface{}, err error) {
 		resp = req
-		fmt.Printf("%+v\n", MetaGetUser(req.Meta))
+		fmt.Printf("%+v\n", req.Meta.GetUser())
 		return
 	}))
 	router.Run(":11115")
@@ -41,8 +41,8 @@ func o(c *gin.Context) {
 
 func TestMidOperator(t *testing.T) {
 	router := gin.New()
-	router.Group("operator/default", MidOperator(nil)).GET("", o)
-	router.Group("operator/code", MidOperator(code.SendClientErrQuery)).GET("", o)
+	router.Group("operator/default", MidOperator()).GET("", o)
+	router.Group("operator/code", MidOperator()).GET("", o)
 	router.Run(":11116")
 }
 
@@ -55,11 +55,11 @@ func TestMidBindUserVideoBuddy(t *testing.T) {
 		Method: http.MethodGet,
 		Url:    "http://test-m.videobuddy.vid007.com/vcoin_rpc/v1/user_device/binding/get?caller=task_wall",
 	}
-	router.Group("user/no_mid_user", MidBindUserVideoBuddy(bind, code.SendServerErrRpc)).GET("", u)
-	hasUser := router.Group("user/has", MidUser(nil))
-	hasUser.Group("default", MidBindUserVideoBuddy(bind, nil)).GET("", u)
+	router.Group("user/no_mid_user", MidBindUserVideoBuddy(bind)).GET("", u)
+	hasUser := router.Group("user/has", MidUser())
+	hasUser.Group("default", MidBindUserVideoBuddy(bind)).GET("", u)
 	hasUser.Group("code",
 		code.MidRespWithErr(true),
-		MidBindUserVideoBuddy(bind, code.SendServerErrRpc)).GET("", u)
+		MidBindUserVideoBuddy(bind)).GET("", u)
 	router.Run(":11116")
 }

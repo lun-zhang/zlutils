@@ -68,17 +68,21 @@ func (user *User) refreshUserIdentity() {
 
 //NOTE: 这两个接口如果调用失败则panic，使用了对应中间件后一定成功
 func GetOperator(c *gin.Context) Operator {
-	return MetaGetOperator(c.Keys)
-}
-func MetaGetOperator(m meta.Meta) Operator {
-	return m.MustGet(KeyOperator).(Operator)
+	return Meta(c.Keys).GetOperator()
 }
 
 func GetUser(c *gin.Context) User {
-	return MetaGetUser(c.Keys)
+	return Meta(c.Keys).GetUser()
 }
-func MetaGetUser(m meta.Meta) User {
-	return m.MustGet(KeyUser).(User)
+
+type Meta meta.Meta
+
+func (m Meta) GetOperator() Operator {
+	return meta.Meta(m).MustGet(KeyOperator).(Operator)
+}
+
+func (m Meta) GetUser() User {
+	return meta.Meta(m).MustGet(KeyUser).(User)
 }
 
 const (
