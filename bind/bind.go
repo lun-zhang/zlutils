@@ -49,81 +49,95 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("in(0) type:%s isn't context.Context", ctxType.Name())
 	}
 
-	var reqValue reflect.Value
-	var reqFieldMap map[string]reflect.Type
+	var (
+		reqType       reflect.Type
+		reqBodyType   reflect.Type
+		reqQueryType  reflect.Type
+		reqUriType    reflect.Type
+		reqHeaderType reflect.Type
+		reqMetaType   reflect.Type
+	)
 	if numIn == 2 {
-		reqType := ft.In(1)
+		reqType = ft.In(1)
 		if reqType.Kind() != reflect.Struct {
 			entry.Fatalf("req kind:%s isn't struct", reqType.Kind())
 		}
-		reqValue = reflect.New(reqType).Elem()
-		reqFieldMap = map[string]reflect.Type{}
 		for i := 0; i < reqType.NumField(); i++ {
 			ti := reqType.Field(i)
-			reqFieldMap[ti.Name] = ti.Type
-			if ti.Name == ReqFieldNameMeta {
-				metaType := ti.Type
-				if metaType.Kind() != reflect.Map {
-					logrus.Fatalf("metaType kind:%s isn't map", metaType.Kind())
+			switch ti.Name {
+			case ReqFieldNameBody:
+				reqBodyType = ti.Type
+			case ReqFieldNameQuery:
+				reqQueryType = ti.Type
+			case ReqFieldNameUri:
+				reqUriType = ti.Type
+			case ReqFieldNameHeader:
+				reqHeaderType = ti.Type
+			case ReqFieldNameMeta:
+				reqMetaType = ti.Type
+				if reqMetaType.Kind() != reflect.Map {
+					entry.Fatalf("reqMetaType kind:%s isn't map", reqMetaType.Kind())
 				}
-				if metaType.Key().Kind() != reflect.String {
-					logrus.Fatalf("metaType map key kind:%s isn't string", metaType.Key().Kind())
+				if reqMetaType.Key().Kind() != reflect.String {
+					entry.Fatalf("reqMetaType map key kind:%s isn't string", reqMetaType.Key().Kind())
 				}
-				if metaType.Elem().Kind() != reflect.Interface {
-					logrus.Fatalf("metaType map value kind:%s isn't interface{}", metaType.Elem().Kind())
+				if reqMetaType.Elem().Kind() != reflect.Interface {
+					entry.Fatalf("reqMetaType map value kind:%s isn't interface{}", reqMetaType.Elem().Kind())
 				}
+			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
+				entry.Fatalf("invalid req field name:%s", ti.Name)
 			}
 		}
 	}
 
 	return func(c *gin.Context) {
 		//处理请求参数
-		if bodyType, ok := reqFieldMap[ReqFieldNameBody]; ok {
-			bodyPtr := reflect.New(bodyType).Interface()
-			if err := c.ShouldBindJSON(bodyPtr); err != nil {
-				code.Send(c, nil, code.ClientErrBody.WithError(err))
-				c.Abort()
-				return
+		in := []reflect.Value{reflect.ValueOf(c.Request.Context())}
+		if reqType != nil {
+			reqValue := reflect.New(reqType).Elem()
+			if reqBodyType != nil {
+				bodyPtr := reflect.New(reqBodyType).Interface()
+				if err := c.ShouldBindJSON(bodyPtr); err != nil {
+					code.Send(c, nil, code.ClientErrBody.WithError(err))
+					c.Abort()
+					return
+				}
+				reqValue.FieldByName(ReqFieldNameBody).Set(reflect.ValueOf(bodyPtr).Elem())
 			}
-			reqValue.FieldByName(ReqFieldNameBody).Set(reflect.ValueOf(bodyPtr).Elem())
-		}
-		if queryType, ok := reqFieldMap[ReqFieldNameQuery]; ok {
-			queryPtr := reflect.New(queryType).Interface()
-			if err := c.ShouldBindQuery(queryPtr); err != nil {
-				code.Send(c, nil, code.ClientErrQuery.WithError(err))
-				c.Abort()
-				return
+			if reqQueryType != nil {
+				queryPtr := reflect.New(reqQueryType).Interface()
+				if err := c.ShouldBindQuery(queryPtr); err != nil {
+					code.Send(c, nil, code.ClientErrQuery.WithError(err))
+					c.Abort()
+					return
+				}
+				reqValue.FieldByName(ReqFieldNameQuery).Set(reflect.ValueOf(queryPtr).Elem())
 			}
-			reqValue.FieldByName(ReqFieldNameQuery).Set(reflect.ValueOf(queryPtr).Elem())
-		}
-		if uriType, ok := reqFieldMap[ReqFieldNameUri]; ok {
-			uriPtr := reflect.New(uriType).Interface()
-			if err := c.ShouldBindUri(uriPtr); err != nil {
-				code.Send(c, nil, code.ClientErrUri.WithError(err))
-				c.Abort()
-				return
+			if reqUriType != nil {
+				uriPtr := reflect.New(reqUriType).Interface()
+				if err := c.ShouldBindUri(uriPtr); err != nil {
+					code.Send(c, nil, code.ClientErrUri.WithError(err))
+					c.Abort()
+					return
+				}
+				reqValue.FieldByName(ReqFieldNameUri).Set(reflect.ValueOf(uriPtr).Elem())
 			}
-			reqValue.FieldByName(ReqFieldNameUri).Set(reflect.ValueOf(uriPtr).Elem())
-		}
-		if headerType, ok := reqFieldMap[ReqFieldNameHeader]; ok {
-			headerPtr := reflect.New(headerType).Interface()
-			if err := ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
-				code.Send(c, nil, code.ClientErrHeader.WithError(err))
-				c.Abort()
-				return
+			if reqHeaderType != nil {
+				headerPtr := reflect.New(reqHeaderType).Interface()
+				if err := ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
+					code.Send(c, nil, code.ClientErrHeader.WithError(err))
+					c.Abort()
+					return
+				}
+				reqValue.FieldByName(ReqFieldNameHeader).Set(reflect.ValueOf(headerPtr).Elem())
 			}
-			reqValue.FieldByName(ReqFieldNameHeader).Set(reflect.ValueOf(headerPtr).Elem())
-		}
-		if _, ok := reqFieldMap[ReqFieldNameMeta]; ok {
-			reqValue.FieldByName(ReqFieldNameMeta).Set(reflect.ValueOf(c.Keys))
+			if reqMetaType != nil {
+				reqValue.FieldByName(ReqFieldNameMeta).Set(reflect.ValueOf(c.Keys))
+			}
+			in = append(in, reqValue)
 		}
 
 		//响应
-		var in []reflect.Value
-		in = append(in, reflect.ValueOf(c.Request.Context()))
-		if numIn == 2 {
-			in = append(in, reqValue)
-		}
 		out := fv.Call(in)
 
 		var resp interface{}
@@ -148,8 +162,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 }
 
-var (
-	//允许用户自定义(其实也可以改成tag，但是不能用FieldByName了)
+const (
 	ReqFieldNameBody   = "Body"
 	ReqFieldNameQuery  = "Query"
 	ReqFieldNameUri    = "Uri"
