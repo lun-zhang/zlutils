@@ -70,3 +70,48 @@ if err := req.Do(ctx, &resp); err != nil {
 	return
 }
 ```
+## 添加query真麻烦怎么办？query只能接收string，所以还得把各种类型转成string?
+假设有个批量获取一类图书信息的GET接口，query参数需要书的type和id数组，
+于是需要设置一个type，并且循环读取id数组，设置到query里
+```go
+req := request.Request{
+	Config: request.Config{
+		Method: http.MethodGet,
+		Url:    "http://localhost:11152/book?caller=test",
+	},
+	Query: request.MSI{
+		"type": "history", //一次性设置
+	},
+}
+ids := []int{1, 2}//假设输入的id数组
+for _, id := range ids {
+	req.AddQuery("id", id) //循环设置
+}
+```
+可以看出这里的id数组是循环设置的，而type参数，我称之为是一次性设置的，直接赋给了map[string]interface{}类型的Query成员，
+一次性设置的用况比较大，所以直接当做map来设置就非常方便  
+AddQuery接收的value是interface，由to.String转成字符串  
+对于Header参数来说，只能是个map，value也由to.String将value转成string
+### 不用这个包，自己拼接query参数就不是那么方便了
+上述query参数拼接完之后应当是
+```
+http://localhost:11152/book?caller=test&type=history&id=1&id=2
+```
+由于url本身带了个query参数caller=test，所以得先把url解码解出自带的query参数，然后加入其他参数type、id数组，
+最后在编码成最终的url
+```go
+bookUrl := "http://localhost:11152/book?caller=test"
+rawUrl, err := url.Parse(bookUrl)
+if err != nil {
+	//错误处理
+	return
+}
+query := rawUrl.Query()
+ids := []int{1, 2}
+query.Add("type", "history")
+for _, id := range ids {
+	query.Add("id", strconv.Itoa(id))
+}
+rawUrl.RawQuery = query.Encode()
+finalUrl := rawUrl.String()//最终的url
+```
