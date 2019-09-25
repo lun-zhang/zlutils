@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"reflect"
 	"testing"
 	"zlutils/caller"
 	"zlutils/code"
@@ -33,9 +34,9 @@ func TestWrap(t *testing.T) {
 }
 
 func api(ctx context.Context, req struct {
-	Body struct {
-		B int `json:"b" binding:"required"`
-	}
+	ComBody
+	//B2//Body出现多次会被检查出来
+	//Body2 int//未识别的名字会被检查出来
 	Uri struct {
 		U int `uri:"u" binding:"required"`
 	}
@@ -84,4 +85,24 @@ func TestWrapApiErr3(t *testing.T) {
 
 func TestWrapApiErr4(t *testing.T) {
 	Wrap(1)
+}
+
+type ComBody struct {
+	Body string
+}
+type B2 struct {
+	Body int
+}
+
+func TestA(t *testing.T) {
+	var req struct {
+		ComBody
+	}
+	req.Body = "abc"
+	//t:=reflect.TypeOf(req)
+	v := reflect.ValueOf(req)
+	b := v.FieldByName("Body")
+	b.Set(reflect.ValueOf("def"))
+	fmt.Println(b)
+	//checkReqType(reflect.TypeOf(req))
 }

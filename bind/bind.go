@@ -15,6 +15,37 @@ func isErrType(t reflect.Type) (ok bool) {
 	return
 }
 
+// 检查请求结构(出现匿名成员时会递归进入)
+// 不允许相同的成员名（例如Body）出现多次，
+// 也不允许出现Body Query Header Uri Meta之外的名称，
+// 不需要这里限制Query Header Uri必须是struct，因为下面gin的bind会检查出来，
+// 但是需要这里检测Meta的类型必须是map[string]interface
+func checkReqType(t reflect.Type, has map[string]struct{}) {
+	if t.Kind() != reflect.Struct {
+		logrus.Fatalf("req kind:%s isn't struct", t.Kind())
+	}
+	for i := 0; i < t.NumField(); i++ {
+		ti := t.Field(i)
+		if ti.Anonymous {
+			checkReqType(ti.Type, has)
+		} else {
+			if _, ok := has[ti.Name]; ok {
+				logrus.Fatalf("req field name:%s appear twice", ti.Name)
+			}
+			has[ti.Name] = struct{}{}
+			switch ti.Name {
+			case ReqFieldNameBody:
+			case ReqFieldNameQuery:
+			case ReqFieldNameUri:
+			case ReqFieldNameHeader:
+			case ReqFieldNameMeta:
+			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
+				logrus.Fatalf("invalid req field name:%s", ti.Name)
+			}
+		}
+	}
+}
+
 func Wrap(api interface{}) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
@@ -49,45 +80,10 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		entry.Fatalf("in(0) type:%s isn't context.Context", ctxType.Name())
 	}
 
-	var (
-		reqType       reflect.Type
-		reqBodyType   reflect.Type
-		reqQueryType  reflect.Type
-		reqUriType    reflect.Type
-		reqHeaderType reflect.Type
-		reqMetaType   reflect.Type
-	)
+	var reqType reflect.Type
 	if numIn == 2 {
 		reqType = ft.In(1)
-		if reqType.Kind() != reflect.Struct {
-			entry.Fatalf("req kind:%s isn't struct", reqType.Kind())
-		}
-		for i := 0; i < reqType.NumField(); i++ {
-			ti := reqType.Field(i)
-			switch ti.Name {
-			case ReqFieldNameBody:
-				reqBodyType = ti.Type
-			case ReqFieldNameQuery:
-				reqQueryType = ti.Type
-			case ReqFieldNameUri:
-				reqUriType = ti.Type
-			case ReqFieldNameHeader:
-				reqHeaderType = ti.Type
-			case ReqFieldNameMeta:
-				reqMetaType = ti.Type
-				if reqMetaType.Kind() != reflect.Map {
-					entry.Fatalf("reqMetaType kind:%s isn't map", reqMetaType.Kind())
-				}
-				if reqMetaType.Key().Kind() != reflect.String {
-					entry.Fatalf("reqMetaType map key kind:%s isn't string", reqMetaType.Key().Kind())
-				}
-				if reqMetaType.Elem().Kind() != reflect.Interface {
-					entry.Fatalf("reqMetaType map value kind:%s isn't interface{}", reqMetaType.Elem().Kind())
-				}
-			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
-				entry.Fatalf("invalid req field name:%s", ti.Name)
-			}
-		}
+		checkReqType(reqType, map[string]struct{}{})
 	}
 
 	return func(c *gin.Context) {
@@ -95,44 +91,45 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		in := []reflect.Value{reflect.ValueOf(c.Request.Context())}
 		if reqType != nil {
 			reqValue := reflect.New(reqType).Elem()
-			if reqBodyType != nil {
-				bodyPtr := reflect.New(reqBodyType).Interface()
+
+			if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
+				bodyPtr := reflect.New(body.Type()).Interface()
 				if err := c.ShouldBindJSON(bodyPtr); err != nil {
 					code.Send(c, nil, code.ClientErrBody.WithError(err))
 					c.Abort()
 					return
 				}
-				reqValue.FieldByName(ReqFieldNameBody).Set(reflect.ValueOf(bodyPtr).Elem())
+				body.Set(reflect.ValueOf(bodyPtr).Elem())
 			}
-			if reqQueryType != nil {
-				queryPtr := reflect.New(reqQueryType).Interface()
+			if query := reqValue.FieldByName(ReqFieldNameQuery); query.IsValid() {
+				queryPtr := reflect.New(query.Type()).Interface()
 				if err := c.ShouldBindQuery(queryPtr); err != nil {
 					code.Send(c, nil, code.ClientErrQuery.WithError(err))
 					c.Abort()
 					return
 				}
-				reqValue.FieldByName(ReqFieldNameQuery).Set(reflect.ValueOf(queryPtr).Elem())
+				query.Set(reflect.ValueOf(queryPtr).Elem())
 			}
-			if reqUriType != nil {
-				uriPtr := reflect.New(reqUriType).Interface()
+			if uri := reqValue.FieldByName(ReqFieldNameUri); uri.IsValid() {
+				uriPtr := reflect.New(uri.Type()).Interface()
 				if err := c.ShouldBindUri(uriPtr); err != nil {
 					code.Send(c, nil, code.ClientErrUri.WithError(err))
 					c.Abort()
 					return
 				}
-				reqValue.FieldByName(ReqFieldNameUri).Set(reflect.ValueOf(uriPtr).Elem())
+				uri.Set(reflect.ValueOf(uriPtr).Elem())
 			}
-			if reqHeaderType != nil {
-				headerPtr := reflect.New(reqHeaderType).Interface()
+			if header := reqValue.FieldByName(ReqFieldNameHeader); header.IsValid() {
+				headerPtr := reflect.New(header.Type()).Interface()
 				if err := ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
 					code.Send(c, nil, code.ClientErrHeader.WithError(err))
 					c.Abort()
 					return
 				}
-				reqValue.FieldByName(ReqFieldNameHeader).Set(reflect.ValueOf(headerPtr).Elem())
+				header.Set(reflect.ValueOf(headerPtr).Elem())
 			}
-			if reqMetaType != nil {
-				reqValue.FieldByName(ReqFieldNameMeta).Set(reflect.ValueOf(c.Keys))
+			if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
+				meta.Set(reflect.ValueOf(c.Keys))
 			}
 			in = append(in, reqValue)
 		}
