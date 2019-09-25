@@ -63,6 +63,32 @@ func noReq(ctx context.Context) (resp interface{}, err error) {
 	return nil, nil
 }
 
+func Info(ctx context.Context, req struct {
+	Body struct {
+		B int `json:"b" binding:"required"`
+	}
+	Uri struct {
+		U int `uri:"u" binding:"required"`
+	}
+	Query struct {
+		Q int `form:"q" binding:"required"`
+	}
+	Header struct {
+		H int `header:"h" binding:"required"`
+	}
+}) (resp struct {
+	R int `json:"r"`
+}, err error) {
+	resp.R = req.Body.B + req.Uri.U + req.Query.Q + req.Header.H
+	return
+}
+
+func TestInfo(t *testing.T) {
+	router := gin.New()
+	router.POST("info", Wrap(Info))
+	router.Run(":11151")
+}
+
 func noResp(ctx context.Context)                   {}
 func resp(ctx context.Context) (resp interface{})  { return nil }
 func resp2(ctx context.Context) (resp interface{}) { return 1 }
