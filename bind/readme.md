@@ -80,6 +80,6 @@ func Info(ctx context.Context, req struct {
 最后用bind.Wrap将info接口变成gin.HandlerFunc
 ```go
 router := gin.New()
-router.POST("info",bind.Wrap(Info))
+router.POST("info/:u",bind.Wrap(Info))
 router.Run(":11151")
 ```
