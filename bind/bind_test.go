@@ -85,7 +85,7 @@ func Info(ctx context.Context, req struct {
 
 func TestInfo(t *testing.T) {
 	router := gin.New()
-	router.POST("info", Wrap(Info))
+	router.POST("info/:u", Wrap(Info))
 	router.Run(":11151")
 }
 
