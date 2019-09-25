@@ -2,7 +2,6 @@ package bind
 
 import (
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"reflect"
@@ -50,8 +49,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
 	entry := logrus.WithFields(logrus.Fields{
-		"ft":     fmt.Sprintf("%s", ft),
-		"fv":     fmt.Sprintf("%s", fv),
+		"ft":     ft.String(),
 		"caller": caller.Caller(2),
 	})
 
