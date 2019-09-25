@@ -9,7 +9,7 @@
 //import zt "zlutils/time"
 config := request.Config{
 	Method: http.MethodPost,
-	Url:    "http://localhost:11151/info/:u",
+	Url:    "http://localhost:11151/info/4",
 	Client: &request.ClientConfig{
 		Timeout: zt.Duration{Duration: time.Second * 2},
 	},
