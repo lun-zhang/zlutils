@@ -20,6 +20,47 @@ func init() {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
 }
 
+func TestInfo(t *testing.T) {
+	config := Config{
+		Method: http.MethodPost,
+		Url:    "http://localhost:11151/info/4",
+		Client: &ClientConfig{
+			Timeout: zt.Duration{Duration: time.Second * 2},
+		},
+	}
+	req := Request{
+		Config: config,
+		Query: MSI{
+			"q": 1,
+		},
+		Header: MSI{
+			"H": 2,
+		},
+		Body: 3,
+	}
+	var resp struct {
+		RetMsg
+		Data struct {
+			R int `json:"r"`
+		}
+	}
+	if err := req.Do(ctx, &resp); err != nil {
+		return
+	}
+}
+
+type RetMsg struct {
+	Ret int    `json:"ret"`
+	Msg string `json:"msg"`
+}
+
+func (m RetMsg) Check() error {
+	if m.Ret != 0 {
+		return fmt.Errorf("ret:%d msg:%s", m.Ret, m.Msg)
+	}
+	return nil
+}
+
 var (
 	addConfig = Config{
 		Method: http.MethodPost,
