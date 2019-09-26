@@ -9,11 +9,11 @@ type Meta map[string]interface{}
 //似乎实现了MustGet Set的都可以当做meta
 func (m Meta) MustGet(k string) interface{} {
 	if m == nil {
-		logrus.Fatal("m is nil")
+		logrus.Panicf("m is nil")
 	}
 	v, ok := (m)[k]
 	if !ok {
-		logrus.WithField("m", m).Fatalf("no key:%s", k)
+		logrus.WithField("m", m).Panicf("no key:%s", k)
 	}
 	return v
 }
