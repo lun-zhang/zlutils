@@ -2,7 +2,7 @@ package meta
 
 import (
 	"github.com/sirupsen/logrus"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/caller"
+	"zlutils/caller"
 )
 
 type Meta map[string]interface{}
