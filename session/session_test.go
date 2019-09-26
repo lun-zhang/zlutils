@@ -28,6 +28,7 @@ func TestMidUser(t *testing.T) {
 	}) (resp interface{}, err error) {
 		resp = req
 		fmt.Printf("%+v\n", req.Meta.GetUser())
+		fmt.Println(req.Meta.Meta())
 		return
 	}))
 	router.Run(":11115")

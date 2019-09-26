@@ -77,6 +77,9 @@ func GetUser(c *gin.Context) User {
 
 type Meta meta.Meta
 
+func (m Meta) Meta() meta.Meta {
+	return meta.Meta(m)
+}
 func (m Meta) GetOperator() Operator {
 	return meta.Meta(m).MustGet(KeyOperator).(Operator)
 }
