@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-type sqlLogger struct{}
+type Logger struct{}
 
 //NOTE: 打印到logrus、trace、xray
-func (l sqlLogger) Print(values ...interface{}) {
+func (l Logger) Print(values ...interface{}) {
 	if len(values) <= 1 {
 		return
 	}
@@ -58,7 +58,7 @@ func New(config Config) *gorm.DB {
 	}
 	db.DB().SetMaxOpenConns(config.MaxOpenConns)
 	db.DB().SetMaxIdleConns(config.MaxIdleConns)
-	db.LogMode(true).SetLogger(&sqlLogger{})
+	db.LogMode(true).SetLogger(&Logger{})
 	entry.Info("mysql connect ok")
 	return db
 }
@@ -71,7 +71,7 @@ func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	}
 	config.Master.setConns(db)
 	config.Slave.setConns(db)
-	db.LogMode(true).SetLogger(&sqlLogger{})
+	db.LogMode(true).SetLogger(&Logger{})
 	entry.Info("mysql connect ok")
 	return db
 }
