@@ -147,7 +147,7 @@ func (w debugWriter) Write(b []byte) (n int, err error) {
 	return w.ResponseWriter.Write(b)
 }
 
-//NOTE: 上线后的接口不该使用这个中间件，对性能有影响
+//NOTE: 上线后日志级别当高于debug，对性能有影响
 func MidDebug() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if logrus.IsLevelEnabled(logrus.DebugLevel) { //这样方便watch level
