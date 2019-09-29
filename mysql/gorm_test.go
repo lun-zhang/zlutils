@@ -15,8 +15,15 @@ import (
 func TestGorm(t *testing.T) {
 	caller.Init("zlutils")
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
-	db := New(Config{
-		Url: "root:123@/counter?charset=utf8&parseTime=True&loc=Local",
+	db := NewMasterAndSlave(ConfigMasterAndSlave{
+		Master: Config{
+			Url:          "root:123@/counter?charset=utf8&parseTime=True&loc=Local",
+			MaxOpenConns: 4,
+		},
+		Slave: Config{
+			Url:          "root:123@/counter?charset=utf8&parseTime=True&loc=Local",
+			MaxOpenConns: 5,
+		},
 	})
 	var cs Counter
 	if err := db.Find(&cs).Error; err != nil {

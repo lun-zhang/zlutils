@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
@@ -69,8 +70,8 @@ func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	if err != nil {
 		entry.WithError(err).Fatal("mysql connect fail")
 	}
-	config.Master.setConns(db)
-	config.Slave.setConns(db)
+	config.Master.setConns(db.DB())
+	config.Slave.setConns(db.DBSlave())
 	db.LogMode(true).SetLogger(&Logger{})
 	entry.Info("mysql connect ok")
 	return db
@@ -82,9 +83,9 @@ type Config struct {
 	MaxIdleConns int    `json:"max_idle_conns"`
 }
 
-func (my Config) setConns(db *gorm.DB) {
-	db.DB().SetMaxOpenConns(my.MaxOpenConns)
-	db.DB().SetMaxIdleConns(my.MaxIdleConns)
+func (my Config) setConns(db *sql.DB) {
+	db.SetMaxOpenConns(my.MaxOpenConns)
+	db.SetMaxIdleConns(my.MaxIdleConns)
 }
 
 type ConfigMasterAndSlave struct {
