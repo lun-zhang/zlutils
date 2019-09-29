@@ -3,7 +3,7 @@ package mysql
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/jinzhu/gorm"
+	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
 	"testing"
 	"time"
@@ -26,7 +26,7 @@ func TestGorm(t *testing.T) {
 		},
 	})
 	var cs Counter
-	if err := db.Find(&cs).Error; err != nil {
+	if err := db.Master().Find(&cs).Error; err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println(cs)
@@ -62,7 +62,7 @@ func TestJustLogger(t *testing.T) {
 	router := gin.New()
 	router.Group(projectName).GET("metrics", metric.Metrics)
 	go func() {
-		//这里的gorm是jinzhu的
+		//这里的gorm可以是jinzhu的
 		dbConn, err := gorm.Open("mysql", "root:123@/counter?charset=utf8&parseTime=True&loc=Local")
 		if err != nil {
 			t.Fatal(err)
