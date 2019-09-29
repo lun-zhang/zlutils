@@ -78,3 +78,69 @@ configMS := mysql.ConfigMasterAndSlave{
 dbConn := mysql.NewMasterAndSlave(configMS)
 ```
 那么在执行sql时候，非事务的读语句会使用从库，非事务的写和事务操作使用主库
+
+# 拓传数据存储，还在每次json.Unmarshal/Marshal?
+有些不会用于WHERE条件，只用来存取的字段，转成json格式的[]byte数组存储到数据库中是较为方便的做法，database/sql/driver提供了2个接口
+```go
+// Scanner is an interface used by Scan.
+type Scanner interface {
+	Scan(src interface{}) error
+}
+
+// Valuer is the interface providing the Value method.
+//
+// Types implementing Valuer interface are able to convert
+// themselves to a driver Value.
+type Valuer interface {
+	// Value returns a driver Value.
+	Value() (Value, error)
+}
+```
+Scan将数据库类型转成你自定义的类型，Value相反，将自定义类型转成数据库类型  
+因此实现这两个方法实现你自定义的类型与json格式的[]byte互转  
+例如有个接口要存取用户联系方式，不需要筛选：  
+那么自定义的Contact类型实现接口(详细代码见type_test.go:TestContact)
+```go
+//import "zlutils/mysql"
+type Contact struct {
+	Phone string `json:"phone"` //电话号码
+	Email string `json:"email"` //邮箱
+}
+
+func (j Contact) Value() (driver.Value, error) {
+	return mysql.Value(j)
+}
+
+func (j *Contact) Scan(src interface{}) error {
+	return mysql.Scan(j, src)
+}
+```
+写入数据库：
+```go
+dbConn.Create(&C{
+	Contact:Contact{
+		Phone:"123",
+		Email:"a@b.com",
+	},
+})
+```
+读取数据库：
+```go
+var cs []C
+dbConn.Find(&cs)
+```
+表结构：
+```mysql
+CREATE TABLE `c` (
+  `contact` TEXT DEFAULT NULL
+);
+```
+写入数据库后的样子：
+```
+mysql> select * from c;
++-----------------------------------+
+| contact                           |
++-----------------------------------+
+| {"phone":"123","email":"a@b.com"} |
++-----------------------------------+
+```
