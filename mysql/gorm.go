@@ -1,16 +1,17 @@
 package mysql
 
 import (
+	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
 	"time"
 )
 
-type sqlLogger struct{}
+type Logger struct{}
 
 //NOTE: 打印到logrus、trace、xray
-func (l sqlLogger) Print(values ...interface{}) {
+func (l Logger) Print(values ...interface{}) {
 	if len(values) <= 1 {
 		return
 	}
@@ -58,7 +59,7 @@ func New(config Config) *gorm.DB {
 	}
 	db.DB().SetMaxOpenConns(config.MaxOpenConns)
 	db.DB().SetMaxIdleConns(config.MaxIdleConns)
-	db.LogMode(true).SetLogger(&sqlLogger{})
+	db.LogMode(true).SetLogger(&Logger{})
 	entry.Info("mysql connect ok")
 	return db
 }
@@ -69,9 +70,9 @@ func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	if err != nil {
 		entry.WithError(err).Fatal("mysql connect fail")
 	}
-	config.Master.setConns(db)
-	config.Slave.setConns(db)
-	db.LogMode(true).SetLogger(&sqlLogger{})
+	config.Master.setConns(db.DB())
+	config.Slave.setConns(db.DBSlave())
+	db.LogMode(true).SetLogger(&Logger{})
 	entry.Info("mysql connect ok")
 	return db
 }
@@ -82,9 +83,9 @@ type Config struct {
 	MaxIdleConns int    `json:"max_idle_conns"`
 }
 
-func (my Config) setConns(db *gorm.DB) {
-	db.DB().SetMaxOpenConns(my.MaxOpenConns)
-	db.DB().SetMaxIdleConns(my.MaxIdleConns)
+func (my Config) setConns(db *sql.DB) {
+	db.SetMaxOpenConns(my.MaxOpenConns)
+	db.SetMaxIdleConns(my.MaxIdleConns)
 }
 
 type ConfigMasterAndSlave struct {
