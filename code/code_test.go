@@ -1,6 +1,7 @@
 package code
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
@@ -84,4 +85,44 @@ func TestMidRespWithErr(t *testing.T) {
 	rpc := router.Group("rpc", MidRespWithErr(false))
 	rpc.GET("", e)
 	router.Run(":11123")
+}
+
+func pj(i interface{}) {
+	b, _ := json.Marshal(i)
+	fmt.Println(string(b))
+}
+
+func TestAddMultiLang(t *testing.T) {
+	c1 := AddMultiLang(1, MLS{
+		"en": "e",
+		"zh": "中",
+	})
+	pj(c1.cloneByLang("en"))
+	pj(c1.cloneByLang("zh"))
+	pj(c1.cloneByLang("hi"))
+}
+
+func TestAddMultiLangNoEn(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log(r)
+		} else {
+			t.Error("must panic")
+		}
+	}()
+	AddMultiLang(1, MLS{ //panic
+		"zh": "中",
+	})
+}
+
+func TestMultiLang(t *testing.T) {
+	co := AddMultiLang(1, MLS{
+		"en": "e",
+		"zh": "中",
+	})
+	r := gin.New()
+	r.GET("code/multi", func(c *gin.Context) {
+		Send(c, nil, co)
+	})
+	r.Run(":12345")
 }
