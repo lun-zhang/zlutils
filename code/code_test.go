@@ -121,8 +121,9 @@ func TestMultiLang(t *testing.T) {
 		"zh": "中",
 	})
 	r := gin.New()
-	r.GET("code/multi", func(c *gin.Context) {
-		Send(c, nil, co)
-	})
+	r.Group("", MidRespWithErr(false)).
+		GET("code/multi", func(c *gin.Context) {
+			Send(c, nil, co.WithErrorf("with"))
+		})
 	r.Run(":12345")
 }
