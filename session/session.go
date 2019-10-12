@@ -9,10 +9,10 @@ import (
 	"zlutils/request"
 )
 
+//请求中获取form，响应中写入json，数据库存gorm
 type Operator struct {
-	//请求中获取form，响应中写入json，数据库存gorm
-	OperatorUid  string `gorm:"column:operator_uid" json:"operator_uid" form:"user_id"`
-	OperatorName string `gorm:"column:operator_name" json:"operator_name" form:"username"`
+	OperatorUid  string `gorm:"column:operator_uid" json:"operator_uid" form:"user_id"`    //操作者id
+	OperatorName string `gorm:"column:operator_name" json:"operator_name" form:"username"` //操作者名字
 }
 
 const (
@@ -44,12 +44,12 @@ func MidOperator() gin.HandlerFunc {
 }
 
 type User struct {
-	UserIdentity   string `json:"user_identity"` //NOTE: 不同产品的用户唯一标志不同
-	UserId         string `json:"user_id"`
-	DeviceId       string `json:"device_id"`
-	ProductId      int    `json:"product_id"`
-	AcceptLanguage string `json:"accept_language"`
-	VersionCode    int    `json:"version_code"`
+	UserIdentity   string `json:"user_identity"`   //NOTE: 不同产品的用户唯一标志不同
+	UserId         string `json:"user_id"`         //用户id
+	DeviceId       string `json:"device_id"`       //设备id
+	ProductId      int    `json:"product_id"`      //产品id
+	AcceptLanguage string `json:"accept_language"` //请求语言
+	VersionCode    int    `json:"version_code"`    //版本号
 }
 
 //发生变化后重设UserIdentity
