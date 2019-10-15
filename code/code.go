@@ -20,7 +20,7 @@ func (code Code) cloneByLang(lang string) Code {
 		return code
 	}
 	//没有则取英语的
-	if msg, ok := code.msgMap[langEn]; ok {
+	if msg, ok := code.msgMap[LangEn]; ok {
 		code.Msg = msg
 		return code
 	}
@@ -46,13 +46,16 @@ func (code Code) Error() string {
 
 var retMap = map[int]struct{}{}
 
-const langEn = "en"
+const (
+	LangEn = "en"
+	LangHi = "hi-IN"
+)
 
 type MLS map[string]string
 
 func Add(ret int, msg string) (code Code) {
 	return add(ret, MLS{
-		langEn: msg, //默认认为是英语
+		LangEn: msg, //默认认为是英语
 	})
 }
 
@@ -61,7 +64,7 @@ func add(ret int, msgMap MLS) (code Code) {
 		panic(fmt.Errorf("ret %d exist", ret)) //NOTE: 禁止传相同的ret
 	}
 	retMap[ret] = struct{}{}
-	if _, ok := msgMap[langEn]; !ok {
+	if _, ok := msgMap[LangEn]; !ok {
 		panic(fmt.Errorf("no english msg")) //必须有英语的msg，空的也允许
 	}
 	code = Code{
@@ -159,7 +162,11 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 			code = ServerErr.WithError(err) //NOTE: 未定义的会被认为是服务器错误，因此客户端错误一定都要定义
 		}
 	}
-	lang := c.Request.Header.Get("Accept-Language")
+	reqHeader := c.Request.Header
+	lang := reqHeader.Get("Device-Language") //优先取站内
+	if lang == "" {
+		lang = reqHeader.Get("Accept-Language") //没有则可能在站外
+	}
 	code = code.cloneByLang(lang) //复制，避免线程竞争
 
 	if code.Err != nil {
