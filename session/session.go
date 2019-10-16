@@ -3,7 +3,7 @@ package session
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"strconv"
+	"zlutils/bind"
 	"zlutils/code"
 	"zlutils/meta"
 	"zlutils/request"
@@ -44,12 +44,13 @@ func MidOperator() gin.HandlerFunc {
 }
 
 type User struct {
-	UserIdentity   string `json:"user_identity"`   //NOTE: 不同产品的用户唯一标志不同
-	UserId         string `json:"user_id"`         //用户id
-	DeviceId       string `json:"device_id"`       //设备id
-	ProductId      int    `json:"product_id"`      //产品id
-	AcceptLanguage string `json:"accept_language"` //请求语言
-	VersionCode    int    `json:"version_code"`    //版本号
+	UserIdentity   string `json:"user_identity" header:"-"`                          //NOTE: 不同产品的用户唯一标志不同
+	UserId         string `json:"user_id" header:"User-Id"`                          //用户id
+	DeviceId       string `json:"device_id" header:"Device-Id"`                      //设备id
+	ProductId      int    `json:"product_id" header:"Product-Id" binding:"required"` //产品id
+	AcceptLanguage string `json:"accept_language" header:"Accept-Language"`          //设备语言
+	DeviceLanguage string `json:"device_language" header:"Device-Language"`          //app语言
+	VersionCode    int    `json:"version_code" header:"Version-Code"`                //版本号
 }
 
 //发生变化后重设UserIdentity
@@ -97,16 +98,13 @@ const (
 func MidUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var err error
-		header := c.Request.Header
-		vc, _ := strconv.Atoi(header.Get("Version-Code"))
-		user := User{
-			//FIXME 从token中获得用户信息，兼容新token
-			UserId:         header.Get("User-Id"),
-			DeviceId:       header.Get("Device-Id"),
-			AcceptLanguage: header.Get("Accept-Language"),
-			VersionCode:    vc,
+		var user User
+		if err = bind.ShouldBindHeader(c.Request.Header, &user); err != nil {
+			code.Send(c, nil, code.ClientErrHeader.WithError(err))
+			c.Abort()
+			return
 		}
-		user.ProductId, _ = strconv.Atoi(header.Get("Product-Id"))
+
 		switch user.ProductId {
 		case ProductIdVClip:
 			if user.UserId == "" {
