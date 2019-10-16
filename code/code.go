@@ -3,13 +3,32 @@ package code
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"reflect"
 )
 
 type Code struct {
-	Ret int    `json:"ret"`
-	Msg string `json:"msg"`
-	Err error  `json:"-"` //真实的err，用于debug返回
+	Ret    int    `json:"ret"`
+	Msg    string `json:"msg"`
+	msgMap MLS    `json:"-"` //多语言的msg
+	Err    error  `json:"-"` //真实的err，用于debug返回
+}
+
+//复制一份，否则线程竞争
+func (code Code) cloneByLang(lang string) Code {
+	if msg, ok := code.msgMap[lang]; ok {
+		code.Msg = msg
+		return code
+	}
+	//没有则取英语的
+	if msg, ok := code.msgMap[LangEn]; ok {
+		code.Msg = msg
+		return code
+	}
+	//通过Add和AddMultiLang生成的Code一定不会到这里
+	//只有可能是故意让ret重复时，直接创建的Code对象
+	return code
 }
 
 func (code Code) WithError(err error) Code {
@@ -29,14 +48,45 @@ func (code Code) Error() string {
 
 var retMap = map[int]struct{}{}
 
-func Add(ret int, msg string) (code Code) {
+const (
+	LangEn = "en"
+	LangHi = "hi-IN"
+)
+
+type MLS map[string]string
+
+//如果msg是string，则当做英语
+//如果msg是map，那么会复制一份，所以可以放心不会被修改
+//如果msg是其他类型则panic
+func Add(ret int, msg interface{}) (code Code) {
+	var msgMap MLS
+	switch msg := msg.(type) {
+	case string:
+		msgMap = MLS{
+			LangEn: msg, //默认认为是英语
+		}
+	case MLS:
+		msgMap = MLS{}
+		for k, v := range msg {
+			msgMap[k] = v //复制一份避免被修改
+		}
+	default:
+		logrus.Panicf("invalid msg type:%s", reflect.TypeOf(msg))
+	}
+	return add(ret, msgMap)
+}
+
+func add(ret int, msgMap MLS) (code Code) {
 	if _, ok := retMap[ret]; ok {
 		panic(fmt.Errorf("ret %d exist", ret)) //NOTE: 禁止传相同的ret
 	}
 	retMap[ret] = struct{}{}
+	if _, ok := msgMap[LangEn]; !ok {
+		panic(fmt.Errorf("no english msg")) //必须有英语的msg，空的也允许
+	}
 	code = Code{
-		Ret: ret,
-		Msg: msg,
+		Ret:    ret,
+		msgMap: msgMap,
 	}
 	return code
 }
@@ -126,6 +176,13 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 			code = ServerErr.WithError(err) //NOTE: 未定义的会被认为是服务器错误，因此客户端错误一定都要定义
 		}
 	}
+	reqHeader := c.Request.Header
+	lang := reqHeader.Get("Device-Language") //优先取站内
+	if lang == "" {
+		lang = reqHeader.Get("Accept-Language") //没有则可能在站外
+	}
+	code = code.cloneByLang(lang) //复制，避免线程竞争
+
 	if code.Err != nil {
 		if _, ok := c.Get(keyRespWithErr); ok {
 			if code.Msg == "" {

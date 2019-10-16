@@ -1,6 +1,7 @@
 package code
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
@@ -84,4 +85,58 @@ func TestMidRespWithErr(t *testing.T) {
 	rpc := router.Group("rpc", MidRespWithErr(false))
 	rpc.GET("", e)
 	router.Run(":11123")
+}
+
+func pj(i interface{}) {
+	b, _ := json.Marshal(i)
+	fmt.Println(string(b))
+}
+
+func TestAdd(t *testing.T) {
+	c1 := Add(1, MLS{
+		"en": "e",
+		"zh": "中",
+	})
+	pj(c1.cloneByLang("en"))
+	pj(c1.cloneByLang("zh"))
+	pj(c1.cloneByLang("hi"))
+}
+
+func TestAddNoEn(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Log(r)
+		} else {
+			t.Error("must panic")
+		}
+	}()
+	Add(1, MLS{ //panic
+		"zh": "中",
+	})
+}
+
+func TestMultiLang(t *testing.T) {
+	co := Add(1, MLS{
+		"en": "e",
+		"zh": "中",
+	})
+	r := gin.New()
+	r.Group("", MidRespWithErr(false)).
+		GET("code/multi", func(c *gin.Context) {
+			Send(c, nil, co.WithErrorf("with"))
+		})
+	r.Run(":12345")
+}
+
+func TestAddIsClone(t *testing.T) {
+	msg := MLS{
+		LangEn: "e",
+	}
+	co := Add(1, msg)
+	fmt.Println(co.msgMap)
+	msg[LangEn] = "e2"
+	fmt.Println(co.msgMap)
+	if co.msgMap[LangEn] != "e" {
+		t.Error("不能被改变")
+	}
 }
