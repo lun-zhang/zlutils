@@ -3,7 +3,9 @@ package code
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"reflect"
 )
 
 type Code struct {
@@ -53,10 +55,25 @@ const (
 
 type MLS map[string]string
 
-func Add(ret int, msg string) (code Code) {
-	return add(ret, MLS{
-		LangEn: msg, //默认认为是英语
-	})
+//如果msg是string，则当做英语
+//如果msg是map，那么会复制一份，所以可以放心不会被修改
+//如果msg是其他类型则panic
+func Add(ret int, msg interface{}) (code Code) {
+	var msgMap MLS
+	switch msg := msg.(type) {
+	case string:
+		msgMap = MLS{
+			LangEn: msg, //默认认为是英语
+		}
+	case MLS:
+		msgMap = MLS{}
+		for k, v := range msg {
+			msgMap[k] = v //复制一份避免被修改
+		}
+	default:
+		logrus.Panicf("invalid msg type:%s", reflect.TypeOf(msg))
+	}
+	return add(ret, msgMap)
 }
 
 func add(ret int, msgMap MLS) (code Code) {
@@ -72,9 +89,6 @@ func add(ret int, msgMap MLS) (code Code) {
 		msgMap: msgMap,
 	}
 	return code
-}
-func AddMultiLang(ret int, msgMap MLS) (code Code) {
-	return add(ret, msgMap)
 }
 
 type Result struct {

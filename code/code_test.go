@@ -92,8 +92,8 @@ func pj(i interface{}) {
 	fmt.Println(string(b))
 }
 
-func TestAddMultiLang(t *testing.T) {
-	c1 := AddMultiLang(1, MLS{
+func TestAdd(t *testing.T) {
+	c1 := Add(1, MLS{
 		"en": "e",
 		"zh": "中",
 	})
@@ -102,7 +102,7 @@ func TestAddMultiLang(t *testing.T) {
 	pj(c1.cloneByLang("hi"))
 }
 
-func TestAddMultiLangNoEn(t *testing.T) {
+func TestAddNoEn(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.Log(r)
@@ -110,13 +110,13 @@ func TestAddMultiLangNoEn(t *testing.T) {
 			t.Error("must panic")
 		}
 	}()
-	AddMultiLang(1, MLS{ //panic
+	Add(1, MLS{ //panic
 		"zh": "中",
 	})
 }
 
 func TestMultiLang(t *testing.T) {
-	co := AddMultiLang(1, MLS{
+	co := Add(1, MLS{
 		"en": "e",
 		"zh": "中",
 	})
@@ -126,4 +126,17 @@ func TestMultiLang(t *testing.T) {
 			Send(c, nil, co.WithErrorf("with"))
 		})
 	r.Run(":12345")
+}
+
+func TestAddIsClone(t *testing.T) {
+	msg := MLS{
+		LangEn: "e",
+	}
+	co := Add(1, msg)
+	fmt.Println(co.msgMap)
+	msg[LangEn] = "e2"
+	fmt.Println(co.msgMap)
+	if co.msgMap[LangEn] != "e" {
+		t.Error("不能被改变")
+	}
 }
