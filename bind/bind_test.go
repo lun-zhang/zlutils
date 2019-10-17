@@ -51,10 +51,14 @@ func api(ctx context.Context, req struct {
 	//Meta int //不是map
 	//Meta map[int]interface{}//key不是string
 	//Meta map[string]int//value不是interface{}
+	C *gin.Context `json:"-"` //NOTE: json.Unmarshal会失败，所以禁掉，避免日志打印时候失败
 }) (resp struct {
 	R interface{} `json:"r"`
 }, err error) {
+	entry := logrus.WithField("req", req)
+	entry.Info()
 	resp.R = req
+	fmt.Println(req.C.ClientIP())
 	return
 	//return resp,fmt.Errorf("e")
 }

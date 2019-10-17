@@ -38,6 +38,7 @@ func checkReqType(t reflect.Type, has map[string]struct{}) {
 			case ReqFieldNameUri:
 			case ReqFieldNameHeader:
 			case ReqFieldNameMeta:
+			case ReqFieldNameC:
 			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
 				logrus.Fatalf("invalid req field name:%s", ti.Name)
 			}
@@ -129,6 +130,9 @@ func Wrap(api interface{}) gin.HandlerFunc {
 			if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
 				meta.Set(reflect.ValueOf(c.Keys))
 			}
+			if fc := reqValue.FieldByName(ReqFieldNameC); fc.IsValid() {
+				fc.Set(reflect.ValueOf(c))
+			}
 			in = append(in, reqValue)
 		}
 
@@ -163,4 +167,5 @@ const (
 	ReqFieldNameUri    = "Uri"
 	ReqFieldNameHeader = "Header"
 	ReqFieldNameMeta   = "Meta"
+	ReqFieldNameC      = "C"
 )
