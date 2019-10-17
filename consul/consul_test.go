@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"testing"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/request"
 	"zlutils/logger"
 	"zlutils/time"
 )
@@ -44,4 +45,12 @@ func TestBindRouter(t *testing.T) {
 
 	BindRouter(admin)
 	r.Run(":11130")
+}
+
+func TestGetJsonValiStruct(t *testing.T) {
+	Init(":8500", "test/service/counter")
+	var yoyo request.Config
+	GetJsonValiStruct("yoyo", &yoyo)
+	var b int
+	GetJsonValiVar("b", &b, "min=2")
 }

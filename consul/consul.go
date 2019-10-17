@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,27 @@ func GetJson(key string, i interface{}) {
 	}
 	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(i).Elem())).Info("consul value ok")
 	kv[key] = reflect.ValueOf(i)
+}
+
+var vali = validator.New()
+
+func GetJsonValiStruct(key string, i interface{}) {
+	GetJson(key, i)
+	if err := vali.Struct(i); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"key": key,
+			"i":   i,
+		}).Fatal()
+	}
+}
+func GetJsonValiVar(key string, i interface{}, tag string) {
+	GetJson(key, i)
+	if err := vali.Var(i, tag); err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"key": key,
+			"i":   i,
+		}).Fatal()
+	}
 }
 
 func WatchJson(key string, i interface{}, handler func()) {
