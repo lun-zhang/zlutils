@@ -118,7 +118,7 @@ func TestWrapApiErr4(t *testing.T) {
 }
 
 type ComBody struct {
-	Body string
+	Body string `bind:"reuse_body"`
 }
 type B2 struct {
 	Body int

@@ -3,6 +3,7 @@ package bind
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/sirupsen/logrus"
 	"reflect"
 	"zlutils/caller"
@@ -93,7 +94,13 @@ func Wrap(api interface{}) gin.HandlerFunc {
 
 			if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
 				bodyPtr := reflect.New(body.Type()).Interface()
-				if err := c.ShouldBindJSON(bodyPtr); err != nil {
+				var err error
+				if bodyType, _ := reqType.FieldByName(ReqFieldNameBody); bodyType.Tag.Get(TagKey) == TagReuseBody {
+					err = c.ShouldBindBodyWith(bodyPtr, binding.JSON)
+				} else {
+					err = c.ShouldBindJSON(bodyPtr)
+				}
+				if err != nil {
 					code.Send(c, nil, code.ClientErrBody.WithError(err))
 					c.Abort()
 					return
@@ -168,4 +175,9 @@ const (
 	ReqFieldNameHeader = "Header"
 	ReqFieldNameMeta   = "Meta"
 	ReqFieldNameC      = "C"
+)
+
+const (
+	TagKey       = "bind"
+	TagReuseBody = "reuse_body"
 )
