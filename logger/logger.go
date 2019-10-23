@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat/go-file-rotatelogs"
 	"github.com/sirupsen/logrus"
@@ -34,6 +35,18 @@ func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 	}
 	e.Time = e.Time.UTC()               //改成UTC时间
 	e.Data["time_unix"] = e.Time.Unix() //方便grep查询范围
+
+	if e.Context != nil {
+		if seg := xray.GetSegment(e.Context); seg != nil {
+			if traceId := seg.TraceID; traceId == "" {
+				if parent := seg.ParentSegment; parent != nil {
+					traceId = parent.TraceID
+					e.Data["trace_id"] = traceId
+				}
+			}
+		}
+	}
+
 	serialized, err = f.JSONFormatter.Format(e)
 	if err != nil {
 		return
