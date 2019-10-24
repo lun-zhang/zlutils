@@ -93,10 +93,10 @@ func (m *Request) AddQuery(k string, v interface{}) {
 	m.query.Add(k, to.String(v))
 }
 
-func (m Request) GetUrl() (string, error) {
+func (m Request) GetUrl(ctx context.Context) (string, error) {
 	rawUrl, err := url.Parse(m.Url)
 	if err != nil {
-		logrus.WithField("m", m).WithError(err).Error()
+		logrus.WithContext(ctx).WithField("m", m).WithError(err).Error()
 		return "", err
 	}
 	//NOTE: 将m.Url中的query、m.Query、m.query合并
@@ -112,9 +112,9 @@ func (m Request) GetUrl() (string, error) {
 	return rawUrl.String(), nil
 }
 
-func (m Request) GetRequest() (request *http.Request, err error) {
-	entry := logrus.WithField("m", m)
-	u, err := m.GetUrl()
+func (m Request) GetRequest(ctx context.Context) (request *http.Request, err error) {
+	entry := logrus.WithContext(ctx).WithField("m", m)
+	u, err := m.GetUrl(ctx)
 	if err != nil {
 		return
 	}
@@ -171,9 +171,9 @@ func tryGetJson(header http.Header, b []byte) (resp interface{}) {
 
 func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
-	entry := logrus.WithField("m", m)
+	entry := logrus.WithContext(ctx).WithField("m", m)
 
-	request, err := m.GetRequest()
+	request, err := m.GetRequest(ctx)
 	if err != nil {
 		return
 	}

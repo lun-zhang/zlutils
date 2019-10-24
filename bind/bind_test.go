@@ -9,6 +9,7 @@ import (
 	"testing"
 	"zlutils/caller"
 	"zlutils/code"
+	"zlutils/guard"
 	"zlutils/logger"
 	"zlutils/meta"
 )
@@ -80,10 +81,13 @@ func Info(ctx context.Context, req struct {
 	Header struct {
 		H int `header:"h" binding:"required"`
 	}
+	C *gin.Context `json:"-"`
 }) (resp struct {
 	R int `json:"r"`
 }, err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
 	resp.R = req.Body.B + req.Uri.U + req.Query.Q + req.Header.H
+	fmt.Println(req.C.Request.Header)
 	return
 }
 

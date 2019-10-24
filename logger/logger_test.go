@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/guard"
 	"zlutils/caller"
+	"zlutils/guard"
 	"zlutils/metric"
 )
 

@@ -3,24 +3,39 @@ package request
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/go-playground/validator"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
+	"zlutils/guard"
 	"zlutils/logger"
 	zt "zlutils/time"
+	zx "zlutils/xray"
 )
 
 var ctx context.Context
 
 func init() {
 	ctx = context.Background()
-	//ctx, _ = xray.BeginSegment(context.Background(), "init")
+	var seg *xray.Segment
+	ctx, seg = xray.BeginSegment(context.Background(), "init")
+	guard.DoBeforeCtx, guard.DoAfter = zx.DoBeforeCtx, zx.DoAfter
+	_ = seg
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
 }
 
-func TestInfo(t *testing.T) {
+func f(ctx context.Context) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+
+	return f2(ctx)
+}
+func f2(ctx context.Context) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+
+	seg := xray.GetSegment(ctx)
+	_ = seg
 	config := Config{
 		Method: http.MethodPost,
 		Url:    "http://localhost:11151/info/4",
@@ -36,7 +51,9 @@ func TestInfo(t *testing.T) {
 		Header: MSI{
 			"H": 2,
 		},
-		Body: 3,
+		Body: MSI{
+			"b": 3,
+		},
 	}
 	var resp struct {
 		RetMsg
@@ -44,9 +61,14 @@ func TestInfo(t *testing.T) {
 			R int `json:"r"`
 		}
 	}
-	if err := req.Do(ctx, &resp); err != nil {
+	if err = req.Do(ctx, &resp); err != nil {
 		return
 	}
+	return
+}
+
+func TestInfo(t *testing.T) {
+	f(ctx)
 }
 
 type RetMsg struct {
