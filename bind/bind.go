@@ -87,58 +87,17 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
+		ctx := c.Request.Context()
+		entry := logrus.WithContext(ctx)
 		//处理请求参数
-		in := []reflect.Value{reflect.ValueOf(c.Request.Context())}
+		in := []reflect.Value{reflect.ValueOf(ctx)}
 		if reqType != nil {
-			reqValue := reflect.New(reqType).Elem()
-
-			if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
-				bodyPtr := reflect.New(body.Type()).Interface()
-				var err error
-				if bodyType, _ := reqType.FieldByName(ReqFieldNameBody); bodyType.Tag.Get(TagKey) == TagReuseBody {
-					err = c.ShouldBindBodyWith(bodyPtr, binding.JSON)
-				} else {
-					err = c.ShouldBindJSON(bodyPtr)
-				}
-				if err != nil {
-					code.Send(c, nil, code.ClientErrBody.WithError(err))
-					c.Abort()
-					return
-				}
-				body.Set(reflect.ValueOf(bodyPtr).Elem())
-			}
-			if query := reqValue.FieldByName(ReqFieldNameQuery); query.IsValid() {
-				queryPtr := reflect.New(query.Type()).Interface()
-				if err := c.ShouldBindQuery(queryPtr); err != nil {
-					code.Send(c, nil, code.ClientErrQuery.WithError(err))
-					c.Abort()
-					return
-				}
-				query.Set(reflect.ValueOf(queryPtr).Elem())
-			}
-			if uri := reqValue.FieldByName(ReqFieldNameUri); uri.IsValid() {
-				uriPtr := reflect.New(uri.Type()).Interface()
-				if err := c.ShouldBindUri(uriPtr); err != nil {
-					code.Send(c, nil, code.ClientErrUri.WithError(err))
-					c.Abort()
-					return
-				}
-				uri.Set(reflect.ValueOf(uriPtr).Elem())
-			}
-			if header := reqValue.FieldByName(ReqFieldNameHeader); header.IsValid() {
-				headerPtr := reflect.New(header.Type()).Interface()
-				if err := ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
-					code.Send(c, nil, code.ClientErrHeader.WithError(err))
-					c.Abort()
-					return
-				}
-				header.Set(reflect.ValueOf(headerPtr).Elem())
-			}
-			if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
-				meta.Set(reflect.ValueOf(c.Keys))
-			}
-			if fc := reqValue.FieldByName(ReqFieldNameC); fc.IsValid() {
-				fc.Set(reflect.ValueOf(c))
+			reqValue, err := ShouldBindReq(c, reqType)
+			if err != nil {
+				entry.WithError(err).Warn()
+				code.Send(c, nil, err)
+				c.Abort()
+				return
 			}
 			in = append(in, reqValue)
 		}
@@ -166,6 +125,56 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		}
 		code.Send(c, resp, err)
 	}
+}
+
+//如果你只是想解析请求结构，那就用这个吧！
+func ShouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
+	reqValue = reflect.New(reqType).Elem()
+
+	if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
+		bodyPtr := reflect.New(body.Type()).Interface()
+		if bodyType, _ := reqType.FieldByName(ReqFieldNameBody); bodyType.Tag.Get(TagKey) == TagReuseBody {
+			err = c.ShouldBindBodyWith(bodyPtr, binding.JSON)
+		} else {
+			err = c.ShouldBindJSON(bodyPtr)
+		}
+		if err != nil {
+			err = code.ClientErrBody.WithError(err)
+			return
+		}
+		body.Set(reflect.ValueOf(bodyPtr).Elem())
+	}
+	if query := reqValue.FieldByName(ReqFieldNameQuery); query.IsValid() {
+		queryPtr := reflect.New(query.Type()).Interface()
+		if err = c.ShouldBindQuery(queryPtr); err != nil {
+			err = code.ClientErrQuery.WithError(err)
+			return
+		}
+		query.Set(reflect.ValueOf(queryPtr).Elem())
+	}
+	if uri := reqValue.FieldByName(ReqFieldNameUri); uri.IsValid() {
+		uriPtr := reflect.New(uri.Type()).Interface()
+		if err = c.ShouldBindUri(uriPtr); err != nil {
+			err = code.ClientErrUri.WithError(err)
+			return
+		}
+		uri.Set(reflect.ValueOf(uriPtr).Elem())
+	}
+	if header := reqValue.FieldByName(ReqFieldNameHeader); header.IsValid() {
+		headerPtr := reflect.New(header.Type()).Interface()
+		if err = ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
+			err = code.ClientErrHeader.WithError(err)
+			return
+		}
+		header.Set(reflect.ValueOf(headerPtr).Elem())
+	}
+	if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
+		meta.Set(reflect.ValueOf(c.Keys))
+	}
+	if fc := reqValue.FieldByName(ReqFieldNameC); fc.IsValid() {
+		fc.Set(reflect.ValueOf(c))
+	}
+	return
 }
 
 const (

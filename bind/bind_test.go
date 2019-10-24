@@ -12,6 +12,7 @@ import (
 	"zlutils/guard"
 	"zlutils/logger"
 	"zlutils/meta"
+	"zlutils/xray"
 )
 
 func init() {
@@ -93,6 +94,7 @@ func Info(ctx context.Context, req struct {
 
 func TestInfo(t *testing.T) {
 	router := gin.New()
+	router.Use(xray.Mid("zlutils", nil, nil, nil))
 	router.POST("info/:u", Wrap(Info))
 	router.Run(":11151")
 }
