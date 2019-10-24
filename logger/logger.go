@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 	"zlutils/caller"
+	"zlutils/consul"
 	"zlutils/xray"
 )
 
@@ -22,23 +23,29 @@ type MyFormatter struct {
 	WriterMap map[logrus.Level]io.Writer
 }
 
+const (
+	FieldStack    = "stack"
+	FieldTraceId  = "trace_id"
+	FieldTimeUnix = "time_unix"
+)
+
 func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 	if MetricCounter != nil {
 		MetricCounter(e).Inc()
 	}
 	if e.Level != logrus.InfoLevel {
-		if stack, ok := e.Data["stack"]; !ok {
-			e.Data["stack"] = caller.Stack(3) //允许外部记录stack，而不覆盖
+		if stack, ok := e.Data[FieldStack]; !ok {
+			e.Data[FieldStack] = caller.Stack(3) //允许外部记录stack，而不覆盖
 		} else if stack == nil {
-			delete(e.Data, "stack") //如果被置为nil则不输出
+			delete(e.Data, FieldStack) //如果被置为nil则不输出
 		}
 	}
-	e.Time = e.Time.UTC()               //改成UTC时间
-	e.Data["time_unix"] = e.Time.Unix() //方便grep查询范围
+	e.Time = e.Time.UTC()                 //改成UTC时间
+	e.Data[FieldTimeUnix] = e.Time.Unix() //方便grep查询范围
 
 	traceId := xray.GetTraceId(e.Context)
 	if traceId != "" {
-		e.Data["trace_id"] = traceId
+		e.Data[FieldTraceId] = traceId
 	}
 
 	serialized, err = f.JSONFormatter.Format(e)
@@ -87,8 +94,8 @@ func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
 		//每天分割
 		rotatelogs.WithRotationTime(time.Hour*24), //默认24h
 		//最多3个文件，配合每天分割文件，则是每3天删除旧日志
-		rotatelogs.WithMaxAge(-1),                          //默认7*24h，配合次数时需显式设为-1关闭
-		rotatelogs.WithRotationCount(output.RotationCount), //默认-1
+		rotatelogs.WithMaxAge(-1),                //默认7*24h，配合次数时需显式设为-1关闭
+		rotatelogs.WithRotationCount(output.Rot), //默认-1
 	)
 	if err != nil {
 		panic(err)
@@ -97,21 +104,29 @@ func getLogWriter(level logrus.Level) *rotatelogs.RotateLogs {
 }
 
 type Config struct {
-	Level  logrus.Level `json:"level"`
-	Output *Output      `json:"output"`
+	Level  logrus.Level `json:"level"`  //Level自带类型检查
+	Output *Output      `json:"output"` //如果nil则输出到屏幕
 }
 type Output struct {
-	//如果nil则输出到屏幕
-	Dir           string `json:"dir"`
-	RotationCount int    `json:"rotation_count"`
+	Dir string `json:"dir"` //目录
+	Rot int    `json:"rot"` //默认为3，表示日志最多保留rot天
 }
 
 var output Output
+
+func InitByConsul(key string) {
+	var config Config
+	consul.GetJson(key, &config)
+	Init(config)
+}
 
 func Init(config Config) {
 	logrus.SetLevel(config.Level)
 	if config.Output != nil {
 		output = *config.Output
+		if output.Rot == 0 {
+			output.Rot = 3
+		}
 		errorWriter := getLogWriter(logrus.ErrorLevel)
 		logrus.SetFormatter(MyFormatter{
 			WriterMap: map[logrus.Level]io.Writer{
@@ -132,7 +147,7 @@ func Init(config Config) {
 
 type debugWriter struct {
 	gin.ResponseWriter
-	logId int64
+	traceId string
 }
 
 func tryGetJson(header http.Header, b []byte) (resp interface{}) {
@@ -147,8 +162,8 @@ func tryGetJson(header http.Header, b []byte) (resp interface{}) {
 //NOTE: 请求和响应会打两条日志，响应的时候会把请求放在一起再打印一遍，可能会觉得冗余，但好处是完整
 func (w debugWriter) Write(b []byte) (n int, err error) {
 	logrus.WithFields(logrus.Fields{
-		"log_id":        w.logId,
-		"stack":         nil,
+		FieldTraceId:    w.traceId,
+		FieldStack:      nil,
 		"response_body": tryGetJson(w.Header(), b),
 	}).Debug()
 	return w.ResponseWriter.Write(b)
@@ -161,20 +176,20 @@ func MidDebug() gin.HandlerFunc {
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(c.Request.Body)
 			reqBody := buf.Bytes()
-			logId := time.Now().UnixNano()
+			traceId := xray.GetTraceId(c.Request.Context())
 			logrus.WithFields(logrus.Fields{
 				//TODO: 完善字段
-				"log_id":       logId,
+				FieldTraceId:   traceId,
 				"path":         c.Request.URL.Path,
 				"method":       c.Request.Method,
 				"header":       c.Request.Header,
 				"request_body": tryGetJson(c.Request.Header, reqBody),
-				"stack":        nil,
+				FieldStack:     nil,
 			}).Debug()
 			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
 			c.Writer = debugWriter{
 				ResponseWriter: c.Writer,
-				logId:          logId,
+				traceId:        traceId,
 			}
 		}
 	}
@@ -185,7 +200,7 @@ func MidInfo() gin.HandlerFunc {
 		if logrus.IsLevelEnabled(logrus.InfoLevel) {
 			start := time.Now()
 			c.Next()
-			logrus.WithFields(logrus.Fields{
+			logrus.WithContext(c.Request.Context()).WithFields(logrus.Fields{
 				"statusCode": c.Writer.Status(),
 				"latency":    time.Now().Sub(start).String(),
 				"clientIP":   c.ClientIP(),

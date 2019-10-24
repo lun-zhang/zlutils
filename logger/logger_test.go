@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 	"zlutils/caller"
+	"zlutils/consul"
 	"zlutils/guard"
 	"zlutils/metric"
+	zx "zlutils/xray"
 )
 
 func TestLog(t *testing.T) {
@@ -27,15 +29,18 @@ func TestLog(t *testing.T) {
 func TestMidDebug(t *testing.T) {
 	caller.Init("zlutils")
 	Init(Config{Level: logrus.DebugLevel})
+
 	router := gin.New()
+	router.Use(zx.Mid("zlutils", nil, nil, nil))
 	router.Group("", MidDebug()).POST("logger", func(c *gin.Context) {
+		logrus.WithContext(c.Request.Context()).Info("api")
 		c.JSON(http.StatusOK, gin.H{
 			"a": gin.H{
 				"b": "s",
 				"i": 1,
 			},
 		})
-		logrus.SetLevel(logrus.InfoLevel) //下次调用就不会输出debug日志
+		//logrus.SetLevel(logrus.InfoLevel) //下次调用就不会输出debug日志
 	})
 	router.Run(":11114")
 }
@@ -91,4 +96,10 @@ func f(ctx context.Context, id int, dep int) (err error) {
 		"dep": dep,
 	}).Info()
 	return f(ctx, id, dep+1)
+}
+
+func TestInitByConsul(t *testing.T) {
+	consul.Init(":8500", "test/service/counter")
+	InitByConsul("log")
+	logrus.Debug("d")
 }
