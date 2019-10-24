@@ -184,3 +184,25 @@ var NameReplace = func(name string) string {
 	}
 	return string(rs)
 }
+
+/*跟踪ctxhttp.Do(ctx, xray.Client(client), request)发现发出请求时设置Header里的TraceId取自于seg.DownstreamHeader()：
+/data/apps/go/pkg/mod/github.com/aws/aws-xray-sdk-go@v1.0.0-rc.5.0.20180720202646-037b81b2bf76/xray/segment_model.go 134行
+*/
+func GetTraceId(ctx context.Context) (traceId string) {
+	if ctx == nil {
+		return
+	}
+	seg := xray.GetSegment(ctx)
+	if seg == nil {
+		return
+	}
+	traceId = seg.TraceID
+	if traceId != "" {
+		return
+	}
+	parent := seg.ParentSegment
+	if parent == nil {
+		return
+	}
+	return parent.TraceID
+}

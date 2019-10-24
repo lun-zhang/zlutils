@@ -1,11 +1,14 @@
 package logger
 
 import (
+	"context"
+	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/guard"
 	"zlutils/caller"
 	"zlutils/metric"
 )
@@ -61,4 +64,31 @@ func TestMidInfo(t *testing.T) {
 		c.JSON(http.StatusOK, 1)
 	})
 	router.Run(":11121")
+}
+
+//验证：
+//1.同一个线程的多个日志的trace_id相同
+//2.不同线程之间trace_id不同
+func TestTraceId(t *testing.T) {
+	Init(Config{Level: logrus.DebugLevel})
+	for i := 1; i <= 2; i++ {
+		go func(id int) {
+			ctx, _ := xray.BeginSegment(context.Background(), "test")
+			f(ctx, id, 1)
+		}(i)
+	}
+	select {}
+}
+
+func f(ctx context.Context, id int, dep int) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+	if dep > 2 {
+		return nil
+	}
+	entry := logrus.WithContext(ctx)
+	entry.WithFields(logrus.Fields{
+		"id":  id,
+		"dep": dep,
+	}).Info()
+	return f(ctx, id, dep+1)
 }

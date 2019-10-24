@@ -60,3 +60,27 @@ func TestBeginSeg(t *testing.T) {
 	ctx := context.Background()
 	fmt.Println(f1(ctx))
 }
+
+func TestGetTraceId(t *testing.T) {
+	ctx, seg := xray.BeginSegment(context.Background(), "test")
+	if err := mustGetTraceId(ctx, 1, seg.TraceID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustGetTraceId(ctx context.Context, dep int, initTraceId string) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+	if dep > 100 {
+		return nil
+	}
+
+	traceId := GetTraceId(ctx)
+	if traceId == "" {
+		return fmt.Errorf("trace id empty")
+	}
+	if traceId != initTraceId {
+		return fmt.Errorf("trace id diff:%s %s", traceId, initTraceId)
+	}
+
+	return mustGetTraceId(ctx, dep+1, initTraceId)
+}
