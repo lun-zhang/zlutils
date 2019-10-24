@@ -45,7 +45,7 @@ type Client struct {
 //TODO: 要加ctx的话就用WithContext
 func (client *Client) SetJson(ctx context.Context, key string, value interface{}, expiration time.Duration) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
-	entry := logrus.WithFields(logrus.Fields{
+	entry := logrus.WithContext(ctx).WithFields(logrus.Fields{
 		"key":        key,
 		"value":      value,
 		"expiration": expiration,
@@ -66,7 +66,7 @@ func (client *Client) SetJson(ctx context.Context, key string, value interface{}
 
 func (client *Client) GetJson(ctx context.Context, key string, value interface{}) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
-	entry := logrus.WithField("key", key)
+	entry := logrus.WithContext(ctx).WithField("key", key)
 	cmd := client.Get(key)
 	entry = entry.WithField("cmd", cmd.String())
 	if err = cmd.Err(); err != nil {
@@ -105,7 +105,7 @@ func (client *Client) MGetJsonMap(ctx context.Context, keys []string, mapPtr int
 		return
 	}
 
-	entry := logrus.WithField("keys", keys)
+	entry := logrus.WithContext(ctx).WithField("keys", keys)
 	cmds := client.MGet(keys...)
 	entry = entry.WithField("cmds", cmds.String())
 	if err = cmds.Err(); err != nil {
@@ -130,7 +130,7 @@ func (client *Client) MGetJsonMap(ctx context.Context, keys []string, mapPtr int
 //批量设置为相同的过期时间
 func (client *Client) MultiSetJson(ctx context.Context, mp map[string]interface{}, expiration time.Duration) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
-	entry := logrus.WithField("mp", mp)
+	entry := logrus.WithContext(ctx).WithField("mp", mp)
 
 	if len(mp) == 0 {
 		return

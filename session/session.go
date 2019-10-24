@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"zlutils/bind"
 	"zlutils/code"
 	"zlutils/meta"
@@ -35,6 +36,7 @@ func MidOperator() gin.HandlerFunc {
 			return
 		}(c)
 		if err != nil {
+			logrus.WithContext(c.Request.Context()).WithError(err).Warn()
 			code.Send(c, nil, code.ClientErrQuery.WithErrorf("invalid operator, err:%s", err.Error()))
 			c.Abort()
 			return
@@ -118,6 +120,7 @@ func MidUser() gin.HandlerFunc {
 			//TODO 后续增加新类型
 		}
 		if err != nil {
+			logrus.WithContext(c.Request.Context()).WithError(err).Warn()
 			code.Send(c, nil, code.ClientErrHeader.WithErrorf("invalid user, %s", err.Error()))
 			c.Abort()
 		} else {
