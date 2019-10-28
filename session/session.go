@@ -8,12 +8,20 @@ import (
 	"zlutils/code"
 	"zlutils/meta"
 	"zlutils/request"
+	"zlutils/time"
 )
 
 //请求中获取form，响应中写入json，数据库存gorm
 type Operator struct {
 	OperatorUid  string `gorm:"column:operator_uid" json:"operator_uid" form:"user_id"`    //操作者id
 	OperatorName string `gorm:"column:operator_name" json:"operator_name" form:"username"` //操作者名字
+}
+
+//通常管理后台的表都有插入、更新时间
+type OperatorWithTime struct {
+	Operator
+	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
+	CreatedAt time.Time `json:"created_at" gorm:"column:created_at"`
 }
 
 const (
