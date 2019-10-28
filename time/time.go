@@ -12,6 +12,10 @@ type Time struct {
 	time.Time
 }
 
+func Now() Time {
+	return Time{Time: time.Now()}
+}
+
 func (t *Time) UnmarshalJSON(b []byte) error {
 	s := string(b)
 	if s == "null" {
