@@ -47,7 +47,7 @@ func (code Code) Error() string {
 	if msg == "" {
 		msg = code.msgMap[LangEn]
 	}
-	return fmt.Sprintf("ret: %d, msg: %s", code.Ret, code.Msg)
+	return fmt.Sprintf("ret: %d, msg: %s", code.Ret, msg)
 }
 
 var retMap = map[int]struct{}{}
