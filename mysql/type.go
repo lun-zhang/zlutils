@@ -47,9 +47,10 @@ func Scan(dest, src interface{}) (err error) {
 }
 
 type (
-	SS  []string
-	MSS map[string]string
-	MSI map[string]interface{}
+	SS       []string
+	IntSlice []int
+	MSS      map[string]string
+	MSI      map[string]interface{}
 )
 
 func (j SS) Value() (driver.Value, error) {
@@ -57,6 +58,13 @@ func (j SS) Value() (driver.Value, error) {
 }
 
 func (j *SS) Scan(src interface{}) error {
+	return Scan(j, src)
+}
+func (j IntSlice) Value() (driver.Value, error) {
+	return Value(j)
+}
+
+func (j *IntSlice) Scan(src interface{}) error {
 	return Scan(j, src)
 }
 
