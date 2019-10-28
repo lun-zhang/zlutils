@@ -43,6 +43,10 @@ func (code Code) Error() string {
 	if code.Err != nil {
 		return code.Err.Error()
 	}
+	msg := code.Msg
+	if msg == "" {
+		msg = code.msgMap[LangEn]
+	}
 	return fmt.Sprintf("ret: %d, msg: %s", code.Ret, code.Msg)
 }
 
