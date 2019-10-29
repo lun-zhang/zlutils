@@ -20,8 +20,8 @@ type Operator struct {
 //通常管理后台的表都有插入、更新时间
 type OperatorWithTime struct {
 	Operator
-	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
-	CreatedAt time.Time `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"` //更新时间
+	CreatedAt time.Time `json:"created_at" gorm:"column:created_at"` //创建时间
 }
 
 const (
