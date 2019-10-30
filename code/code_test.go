@@ -73,6 +73,11 @@ func do(i int) (resp struct {
 func TestWrapSend(t *testing.T) {
 	router := gin.New()
 	router.Group("", MidRespWithErr(false)).GET("we", WrapSend(ew))
+	router.GET("nil", func(c *gin.Context) {
+		var s *string
+		fmt.Println(s == nil)
+		Send(c, s, nil)
+	})
 	router.Run(":11124")
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 type C struct {
-	Contact Contact `gorm:"column:contact"`
+	Contact *Contact `gorm:"column:contact"`
 }
 
 func (C) TableName() string {
@@ -33,10 +33,15 @@ func TestContact(t *testing.T) {
 		Url: "root:123@/test?charset=utf8&parseTime=True&loc=Local",
 	})
 	if err := dbConn.Create(&C{
-		Contact: Contact{
+		Contact: &Contact{
 			Phone: "123",
 			Email: "a@b.com",
 		},
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := dbConn.Create(&C{
+		Contact: nil, //插入NULL
 	}).Error; err != nil {
 		t.Fatal(err)
 	}

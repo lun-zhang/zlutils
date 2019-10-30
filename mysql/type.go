@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"zlutils/misc"
 )
 
 func SetZero(i interface{}) (err error) {
@@ -16,17 +17,8 @@ func SetZero(i interface{}) (err error) {
 	return
 }
 
-func IsPtrNil(i interface{}) (ok bool) {
-	defer func() {
-		if err := recover(); err != nil {
-			ok = false
-		}
-	}()
-	return reflect.ValueOf(i).IsNil() //TODO 非指针类型会panic，所以recover并返回false，是否有更好的做法？
-}
-
 func Value(i interface{}) (driver.Value, error) {
-	if IsPtrNil(i) { //NOTE: 如果是nil则插入到数据库NULL
+	if misc.IsNil(i) { //NOTE: 如果是nil则插入到数据库NULL
 		return nil, nil
 	}
 	return json.Marshal(i) //struct类型不会为nil，即使是零值也会插入到数据库

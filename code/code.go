@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
+	"zlutils/misc"
 )
 
 type Code struct {
@@ -197,8 +198,9 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 		}
 	}
 
-	if code.Ret != 0 {
-		data = nil //NOTE: 不是成功就不反回data
+	if code.Ret != 0 || //不是成功就不反回data
+		misc.IsNil(data) { //如果data设为nil则也不返回
+		data = nil
 	}
 	c.Set(KeyRet, code.Ret) //保存ret用于metrics
 	c.JSON(http.StatusOK, Result{
