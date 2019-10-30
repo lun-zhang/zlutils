@@ -115,10 +115,14 @@ func Wrap(api interface{}) gin.HandlerFunc {
 					err = out[0].Interface().(error)
 				}
 			} else { //(resp)
-				resp = out[0].Interface()
+				if !out[0].IsNil() {
+					resp = out[0].Interface()
+				}
 			}
 		case 2: //(resp,err)
-			resp = out[0].Interface()
+			if !out[0].IsNil() {
+				resp = out[0].Interface()
+			}
 			if !out[1].IsNil() {
 				err = out[1].Interface().(error)
 			}
