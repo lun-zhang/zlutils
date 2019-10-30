@@ -115,20 +115,33 @@ func Wrap(api interface{}) gin.HandlerFunc {
 					err = out[0].Interface().(error)
 				}
 			} else { //(resp)
-				if !out[0].IsNil() {
-					resp = out[0].Interface()
-				}
+				resp = getInterfaceNilIsNil(out[0])
 			}
 		case 2: //(resp,err)
-			if !out[0].IsNil() {
-				resp = out[0].Interface()
-			}
+			resp = getInterfaceNilIsNil(out[0])
 			if !out[1].IsNil() {
 				err = out[1].Interface().(error)
 			}
 		}
 		code.Send(c, resp, err)
 	}
+}
+
+func getInterfaceNilIsNil(v reflect.Value) interface{} {
+	k := v.Kind()
+	switch k {
+	case reflect.Chan,
+		reflect.Func,
+		reflect.Map,
+		reflect.Ptr,
+		reflect.UnsafePointer,
+		reflect.Interface,
+		reflect.Slice:
+		if v.IsNil() {
+			return nil
+		}
+	}
+	return v.Interface()
 }
 
 //如果你只是想解析请求结构，那就用这个吧！
