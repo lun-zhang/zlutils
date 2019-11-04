@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
+//虽然这个Logger也可以打印github.com/jinzhu/gorm的日志，但是没有ctx所以无法加入trace_id，
+// 因此github.com/lun-zhang/gorm v1.13.1直接打印了日志，有tract_id
 type Logger struct{}
 
 //NOTE: 打印到logrus、trace、xray
-func (l Logger) Print(values ...interface{}) {
+func (Logger) Print(values ...interface{}) {
 	if len(values) <= 1 {
 		return
 	}
@@ -50,6 +52,29 @@ func (l Logger) Print(values ...interface{}) {
 	}
 }
 
+//只监控不日志，日志已放到github.com/lun-zhang/gorm中
+type metricLogger struct{}
+
+func (metricLogger) Print(values ...interface{}) {
+	if len(values) <= 1 {
+		return
+	}
+
+	if level := values[0]; level == "sql" {
+		// duration
+		duration := values[2].(time.Duration)
+		// sql
+		query := values[3].(string)
+		args := values[4].([]interface{})
+		if MetricCounter != nil {
+			MetricCounter(query, args...).Inc()
+		}
+		if MetricLatency != nil {
+			MetricLatency(query, args...).Observe(duration.Seconds() * 1000)
+		}
+	}
+}
+
 //NOTE 只能用于初始化，失败则fatal
 func New(config Config) *gorm.DB {
 	entry := logrus.WithField("config", config)
@@ -59,7 +84,7 @@ func New(config Config) *gorm.DB {
 	}
 	db.DB().SetMaxOpenConns(config.MaxOpenConns)
 	db.DB().SetMaxIdleConns(config.MaxIdleConns)
-	db.LogMode(true).SetLogger(&Logger{})
+	db.LogMode(true).SetLogger(&metricLogger{})
 	entry.Info("mysql connect ok")
 	return db
 }
@@ -72,7 +97,7 @@ func NewMasterAndSlave(config ConfigMasterAndSlave) *gorm.DB {
 	}
 	config.Master.setConns(db.DB())
 	config.Slave.setConns(db.DBSlave())
-	db.LogMode(true).SetLogger(&Logger{})
+	db.LogMode(true).SetLogger(&metricLogger{})
 	entry.Info("mysql connect ok")
 	return db
 }

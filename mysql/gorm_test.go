@@ -1,7 +1,9 @@
 package mysql
 
 import (
+	"context"
 	"fmt"
+	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
@@ -56,6 +58,12 @@ func TestMetric(t *testing.T) {
 	router.Run(":11119")
 }
 
+var ctx, _ = xray.BeginSegment(context.Background(), "test")
+
+func init() {
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
+}
+
 func TestJustLogger(t *testing.T) {
 	const projectName = "zlutils"
 	InitDefaultMetric(projectName)
@@ -78,4 +86,26 @@ func TestJustLogger(t *testing.T) {
 		}
 	}()
 	router.Run(":11118")
+}
+
+func TestMetricLogger_Print(t *testing.T) {
+	const projectName = "zlutils"
+	InitDefaultMetric(projectName)
+	router := gin.New()
+	router.Group(projectName).GET("metrics", metric.Metrics)
+	go func() {
+		dbConn := New(Config{Url: "root:123@/counter?charset=utf8&parseTime=True&loc=Local"})
+		for {
+			var cs []Counter
+			if err := dbConn.
+				WithContext(ctx).
+				Find(&cs).
+				Error; err != nil {
+				panic(err)
+			}
+			fmt.Println(len(cs))
+			time.Sleep(time.Second)
+		}
+	}()
+	router.Run(":11119")
 }
