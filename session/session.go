@@ -117,8 +117,8 @@ func MidUser() gin.HandlerFunc {
 
 		switch user.ProductId {
 		case ProductIdVClip:
-			if user.UserId == "" {
-				err = fmt.Errorf("User-Id is empty") //vclip以UserId为主，所以必须有
+			if user.UserId == "" || user.DeviceId == "" {
+				err = fmt.Errorf("User-Id or Device-Id is empty") //vclip以UserId为主，所以必须有，加金币时需要Device-Id，所以两者都要有
 			}
 		case ProductIdVideoBuddy:
 			if user.UserId == "" && user.DeviceId == "" {
