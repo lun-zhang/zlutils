@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/hashicorp/go-uuid v1.0.1
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
-	github.com/lun-zhang/gorm v1.13.2
+	github.com/lun-zhang/gorm v1.13.3
 	github.com/prometheus/client_golang v0.9.3
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
