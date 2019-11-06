@@ -10,13 +10,13 @@ import (
 )
 
 type Tmp struct {
-	D time.Duration `json:"d"`
+	D *time.Duration `json:"d" validate:"required"`
 }
 
 func TestWatchJson(t *testing.T) {
 	Init(":8500", "test/service/counter")
 	var tmp Tmp
-	WatchJson("tmp", &tmp, func() {
+	ValiStruct().WatchJson("tmp", &tmp, func() {
 		//panic(1)
 		fmt.Println("change to", tmp)
 	})
@@ -52,15 +52,22 @@ func TestBindRouter(t *testing.T) {
 func TestGetJsonValiStruct(t *testing.T) {
 	Init(":8500", "test/service/counter")
 	var yoyo request.Config
-	GetJsonValiStruct("yoyo", &yoyo)
+	ValiStruct().GetJson("yoyo", &yoyo)
 	var b int
-	GetJsonValiVar("b", &b, "min=2")
+	ValiVar("min=2").GetJson("b", &b)
 }
 
 func TestWatchJsonHandler(t *testing.T) {
 	Init(":8500", "test/service/counter")
-	WatchJsonHandler("log_watch", func(log logger.Config) {
-		fmt.Println(log)
+	ValiStruct().WatchJsonVarious("tmp", func(tmp Tmp) {
+		fmt.Println(tmp)
 	})
 	select {}
+}
+
+func TestGetJsonHandler(t *testing.T) {
+	Init(":8500", "test/service/counter")
+	GetJson("log_watch", func(log logger.Config) {
+		fmt.Println(log.Level)
+	})
 }

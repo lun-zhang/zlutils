@@ -34,17 +34,88 @@ func GetValue(key string) (value []byte) {
 
 var kv = map[string]reflect.Value{}
 
-func GetJson(key string, ptr interface{}) {
-	value := GetValue(key)
-	if err := json.Unmarshal(value, ptr); err != nil {
-		logrus.WithError(err).WithField(key, string(value)).Panic("consul value invalid")
+func getJson(key string, i interface{}, vaPtr *va) {
+	t := reflect.TypeOf(i)
+	entry := logrus.WithFields(logrus.Fields{
+		"key":  key,
+		"type": t.String(),
+	})
+
+	switch t.Kind() {
+	case reflect.Ptr:
+		value := GetValue(key)
+		entry = entry.WithField("bs", string(value))
+		if err := json.Unmarshal(value, i); err != nil {
+			entry.WithError(err).Panic("consul value invalid")
+		}
+		entry = entry.WithField("value", i)
+		if err := valiVa(vaPtr, i); err != nil {
+			entry.WithError(err).Panicf("vali failed")
+		}
+		entry.Info("consul value ok")
+		kv[key] = reflect.ValueOf(i)
+		return
+	case reflect.Func:
+		if t.NumIn() != 1 {
+			entry.Panicf("numIn:%d != 1", t.NumIn())
+		}
+		v := reflect.ValueOf(i)
+
+		in0Type := t.In(0)
+		in0Ptr := reflect.New(in0Type).Interface()
+		getJson(key, in0Ptr, vaPtr)
+		v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
+		return
+	default:
+		entry.Panicf("invalid value kind:%s", t.Kind())
 	}
-	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(ptr).Elem())).Info("consul value ok")
-	kv[key] = reflect.ValueOf(ptr)
+}
+
+//如果对值不关心，只想要用这个值去执行一个函数，例如用于初始化日志，那么第二个参数就传入有一个入参的函数吧
+func GetJson(key string, i interface{}) {
+	getJson(key, i, nil)
+}
+
+type va struct {
+	t   int
+	tag string
+}
+
+const (
+	valiStruct = 1
+	valiVar    = 2
+)
+
+func ValiStruct() va {
+	return va{t: valiStruct}
+}
+func ValiVar(tag string) va {
+	return va{
+		t:   valiVar,
+		tag: tag,
+	}
+}
+func (m va) GetJson(key string, i interface{}) {
+	getJson(key, i, &m)
+}
+
+func valiVa(vaPtr *va, i interface{}) error {
+	if vaPtr == nil {
+		return nil
+	}
+	switch vaPtr.t {
+	case valiStruct:
+		return vali.Struct(i)
+	case valiVar:
+		return vali.Var(i, vaPtr.tag)
+	default:
+		return fmt.Errorf("invalid m.t:%d", vaPtr.t)
+	}
 }
 
 var vali = validator.New()
 
+// Deprecated: 用ValiStruct().GetJson()
 func GetJsonValiStruct(key string, ptr interface{}) {
 	GetJson(key, ptr)
 	if err := vali.Struct(ptr); err != nil {
@@ -54,6 +125,8 @@ func GetJsonValiStruct(key string, ptr interface{}) {
 		}).Panic()
 	}
 }
+
+// Deprecated: 用ValiVar(tag).GetJson()
 func GetJsonValiVar(key string, ptr interface{}, tag string) {
 	GetJson(key, ptr)
 	if err := vali.Var(ptr, tag); err != nil {
@@ -64,7 +137,15 @@ func GetJsonValiVar(key string, ptr interface{}, tag string) {
 	}
 }
 
+func (m va) WatchJson(key string, ptr interface{}, handler func()) {
+	watchJson(key, ptr, handler, &m)
+}
+
 func WatchJson(key string, ptr interface{}, handler func()) {
+	watchJson(key, ptr, handler, nil)
+}
+
+func watchJson(key string, ptr interface{}, handler func(), vaPtr *va) {
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
@@ -80,17 +161,20 @@ func WatchJson(key string, ptr interface{}, handler func()) {
 		defer func() {
 			//避免对外部造成影响
 			if r := recover(); r != nil {
-				entry.WithField("value", string(value)).
-					Errorf("panic: %v", r)
+				entry.Errorf("panic: %v", r)
 			}
 		}()
 		if kv, ok := raw.(*api.KVPair); ok && kv != nil {
 			value = kv.Value
+			entry = entry.WithField("bs", string(value))
 			mysql.SetZero(ptr) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
-			if err := json.Unmarshal(kv.Value, ptr); err != nil {
-				entry.WithError(err).
-					WithField("value", string(kv.Value)).
-					Errorf("consul watch unmarshal json failed")
+			if err := json.Unmarshal(value, ptr); err != nil {
+				entry.WithError(err).Errorf("consul watch unmarshal json failed")
+				return
+			}
+			entry = entry.WithField("value", ptr)
+			if err := valiVa(vaPtr, ptr); err != nil {
+				entry.WithError(err).Error("vali failed")
 				return
 			}
 			if handler != nil {
@@ -106,27 +190,37 @@ func WatchJson(key string, ptr interface{}, handler func()) {
 	go plan.Run(Address)
 }
 
+func (m va) WatchJsonVarious(key string, i interface{}) {
+	watchJsonVarious(key, i, &m)
+}
+
 //只关心修改后函数的执行
 //consul监控key对应的value的变化，然后调用函数handler(value)
-func WatchJsonHandler(key string, handler interface{}) {
-	t := reflect.TypeOf(handler)
-	entry := logrus.WithFields(logrus.Fields{
-		"key":     key,
-		"handler": t.String(),
-	})
-	if t.Kind() != reflect.Func {
-		entry.Panicf("handler kind:%s is'nt func", t.Kind())
-	}
-	if t.NumIn() != 1 {
-		entry.Panicf("numIn:%d != 1", t.NumIn())
-	}
-	v := reflect.ValueOf(handler)
+func WatchJsonVarious(key string, i interface{}) {
+	watchJsonVarious(key, i, nil)
+}
 
-	in0Type := t.In(0)
-	in0Ptr := reflect.New(in0Type).Interface()
-	WatchJson(key, in0Ptr, func() {
-		v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
+func watchJsonVarious(key string, i interface{}, vaPtr *va) {
+	t := reflect.TypeOf(i)
+	entry := logrus.WithFields(logrus.Fields{
+		"key":  key,
+		"type": t.String(),
 	})
+	switch t.Kind() {
+	case reflect.Ptr:
+		watchJson(key, i, nil, vaPtr)
+	case reflect.Func:
+		if t.NumIn() != 1 {
+			entry.Panicf("numIn:%d != 1", t.NumIn())
+		}
+		v := reflect.ValueOf(i)
+
+		in0Type := t.In(0)
+		in0Ptr := reflect.New(in0Type).Interface() //为了避免再写一遍WatchJson而采用的偷懒做法
+		watchJson(key, in0Ptr, func() {
+			v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
+		}, vaPtr)
+	}
 }
 
 func Init(address string, prefix string) {
