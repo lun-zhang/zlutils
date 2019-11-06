@@ -122,8 +122,7 @@ func InitByConsul(key string) {
 	Init(config)
 }
 func WatchByConsul(key string) {
-	var config Config
-	consul.WatchJson(key, &config, func() {
+	consul.WatchJsonHandler(key, func(config Config) {
 		Init(config)
 	})
 }
