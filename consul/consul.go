@@ -21,14 +21,16 @@ var (
 )
 
 func GetValue(key string) (value []byte) {
+	entry := logrus.WithField("key", key)
 	pair, _, err := KV.Get(fmt.Sprintf("%s/%s", Prefix, key), nil)
 	if err != nil {
-		logrus.WithError(err).WithField("key", key).Panic()
+		entry.WithError(err).Panic()
 	}
 	if pair == nil {
-		err = fmt.Errorf("consul has't key")
-		logrus.WithError(err).WithField("key", key).Panic()
+		entry.Panic("consul has't key")
 	}
+	//entry = entry.WithField("bs", string(value))
+	//entry.Info("consul get bs ok")
 	return pair.Value
 }
 
@@ -52,7 +54,7 @@ func getJson(key string, i interface{}, vaPtr *va) {
 		if err := valiVa(vaPtr, i); err != nil {
 			entry.WithError(err).Panicf("vali failed")
 		}
-		entry.Info("consul value ok")
+		entry.Info("consul get value ok")
 		kv[key] = reflect.ValueOf(i)
 		return
 	case reflect.Func:
@@ -177,6 +179,7 @@ func watchJson(key string, ptr interface{}, handler func(), vaPtr *va) {
 				entry.WithError(err).Error("vali failed")
 				return
 			}
+			entry.Info("consul watch value ok")
 			if handler != nil {
 				handler() //启动时会起个线程执行一次，发生修改后回调
 			}
