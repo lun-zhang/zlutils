@@ -56,3 +56,11 @@ func TestGetJsonValiStruct(t *testing.T) {
 	var b int
 	GetJsonValiVar("b", &b, "min=2")
 }
+
+func TestWatchJsonHandler(t *testing.T) {
+	Init(":8500", "test/service/counter")
+	WatchJsonHandler("log_watch", func(log logger.Config) {
+		fmt.Println(log)
+	})
+	select {}
+}

@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/mysql"
+	"zlutils/mysql"
 )
 
 var (
@@ -34,37 +34,37 @@ func GetValue(key string) (value []byte) {
 
 var kv = map[string]reflect.Value{}
 
-func GetJson(key string, i interface{}) {
+func GetJson(key string, ptr interface{}) {
 	value := GetValue(key)
-	if err := json.Unmarshal(value, i); err != nil {
+	if err := json.Unmarshal(value, ptr); err != nil {
 		logrus.WithError(err).WithField(key, string(value)).Panic("consul value invalid")
 	}
-	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(i).Elem())).Info("consul value ok")
-	kv[key] = reflect.ValueOf(i)
+	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(ptr).Elem())).Info("consul value ok")
+	kv[key] = reflect.ValueOf(ptr)
 }
 
 var vali = validator.New()
 
-func GetJsonValiStruct(key string, i interface{}) {
-	GetJson(key, i)
-	if err := vali.Struct(i); err != nil {
+func GetJsonValiStruct(key string, ptr interface{}) {
+	GetJson(key, ptr)
+	if err := vali.Struct(ptr); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"key": key,
-			"i":   i,
+			"ptr": ptr,
 		}).Panic()
 	}
 }
-func GetJsonValiVar(key string, i interface{}, tag string) {
-	GetJson(key, i)
-	if err := vali.Var(i, tag); err != nil {
+func GetJsonValiVar(key string, ptr interface{}, tag string) {
+	GetJson(key, ptr)
+	if err := vali.Var(ptr, tag); err != nil {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"key": key,
-			"i":   i,
+			"ptr": ptr,
 		}).Panic()
 	}
 }
 
-func WatchJson(key string, i interface{}, handler func()) {
+func WatchJson(key string, ptr interface{}, handler func()) {
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
@@ -86,8 +86,8 @@ func WatchJson(key string, i interface{}, handler func()) {
 		}()
 		if kv, ok := raw.(*api.KVPair); ok && kv != nil {
 			value = kv.Value
-			mysql.SetZero(i) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
-			if err := json.Unmarshal(kv.Value, i); err != nil {
+			mysql.SetZero(ptr) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
+			if err := json.Unmarshal(kv.Value, ptr); err != nil {
 				entry.WithError(err).
 					WithField("value", string(kv.Value)).
 					Errorf("consul watch unmarshal json failed")
@@ -104,6 +104,29 @@ func WatchJson(key string, i interface{}, handler func()) {
 		}
 	}
 	go plan.Run(Address)
+}
+
+//只关心修改后函数的执行
+//consul监控key对应的value的变化，然后调用函数handler(value)
+func WatchJsonHandler(key string, handler interface{}) {
+	t := reflect.TypeOf(handler)
+	entry := logrus.WithFields(logrus.Fields{
+		"key":     key,
+		"handler": t.String(),
+	})
+	if t.Kind() != reflect.Func {
+		entry.Panicf("handler kind:%s is'nt func", t.Kind())
+	}
+	if t.NumIn() != 1 {
+		entry.Panicf("numIn:%d != 1", t.NumIn())
+	}
+	v := reflect.ValueOf(handler)
+
+	in0Type := t.In(0)
+	in0Ptr := reflect.New(in0Type).Interface()
+	WatchJson(key, in0Ptr, func() {
+		v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
+	})
 }
 
 func Init(address string, prefix string) {
