@@ -112,12 +112,24 @@ type Output struct {
 	Rot int    `json:"rot"` //默认为3，表示日志最多保留rot天
 }
 
+var defaultConfig = Config{Level: logrus.InfoLevel}
+
 var output Output
 
 func InitByConsul(key string) {
 	var config Config
 	consul.GetJson(key, &config)
 	Init(config)
+}
+func WatchByConsul(key string) {
+	var config Config
+	consul.WatchJson(key, &config, func() {
+		Init(config)
+	})
+}
+
+func init() {
+	Init(defaultConfig)
 }
 
 func Init(config Config) {

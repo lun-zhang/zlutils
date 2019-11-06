@@ -17,8 +17,10 @@ func TestWatchJson(t *testing.T) {
 	Init(":8500", "test/service/counter")
 	var tmp Tmp
 	WatchJson("tmp", &tmp, func() {
+		//panic(1)
 		fmt.Println("change to", tmp)
 	})
+	fmt.Println(tmp) //{0s}
 	select {}
 }
 

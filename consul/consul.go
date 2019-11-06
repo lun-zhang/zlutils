@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/mysql"
 )
 
 var (
@@ -22,11 +23,11 @@ var (
 func GetValue(key string) (value []byte) {
 	pair, _, err := KV.Get(fmt.Sprintf("%s/%s", Prefix, key), nil)
 	if err != nil {
-		logrus.WithError(err).WithField("key", key).Fatal()
+		logrus.WithError(err).WithField("key", key).Panic()
 	}
 	if pair == nil {
 		err = fmt.Errorf("consul has't key")
-		logrus.WithError(err).WithField("key", key).Fatal()
+		logrus.WithError(err).WithField("key", key).Panic()
 	}
 	return pair.Value
 }
@@ -36,7 +37,7 @@ var kv = map[string]reflect.Value{}
 func GetJson(key string, i interface{}) {
 	value := GetValue(key)
 	if err := json.Unmarshal(value, i); err != nil {
-		logrus.WithError(err).WithField(key, string(value)).Fatal("consul value invalid")
+		logrus.WithError(err).WithField(key, string(value)).Panic("consul value invalid")
 	}
 	logrus.WithField(key, fmt.Sprintf("%+v", reflect.ValueOf(i).Elem())).Info("consul value ok")
 	kv[key] = reflect.ValueOf(i)
@@ -50,7 +51,7 @@ func GetJsonValiStruct(key string, i interface{}) {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"key": key,
 			"i":   i,
-		}).Fatal()
+		}).Panic()
 	}
 }
 func GetJsonValiVar(key string, i interface{}, tag string) {
@@ -59,7 +60,7 @@ func GetJsonValiVar(key string, i interface{}, tag string) {
 		logrus.WithError(err).WithFields(logrus.Fields{
 			"key": key,
 			"i":   i,
-		}).Fatal()
+		}).Panic()
 	}
 }
 
@@ -69,18 +70,34 @@ func WatchJson(key string, i interface{}, handler func()) {
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
 	})
 	if err != nil {
-		logrus.WithError(err).Fatal("consul watch parse failed")
+		logrus.WithField("key", key).
+			WithError(err).
+			Panic("consul watch parse failed")
 	}
 	plan.Handler = func(idx uint64, raw interface{}) {
+		entry := logrus.WithField("key", key)
+		var value []byte
+		defer func() {
+			//避免对外部造成影响
+			if r := recover(); r != nil {
+				entry.WithField("value", string(value)).
+					Errorf("panic: %v", r)
+			}
+		}()
 		if kv, ok := raw.(*api.KVPair); ok && kv != nil {
+			value = kv.Value
+			mysql.SetZero(i) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
 			if err := json.Unmarshal(kv.Value, i); err != nil {
-				logrus.WithError(err).WithField(key, string(kv.Value)).Errorf("consul watch unmarshal json failed")
+				entry.WithError(err).
+					WithField("value", string(kv.Value)).
+					Errorf("consul watch unmarshal json failed")
 				return
 			}
-			handler() //发生修改后回调
+			if handler != nil {
+				handler() //启动时会起个线程执行一次，发生修改后回调
+			}
 		} else {
-			logrus.WithFields(logrus.Fields{
-				"key": key,
+			entry.WithFields(logrus.Fields{
 				"idx": idx,
 				"raw": raw,
 			}).Errorf("consul watch invalid raw")
@@ -98,7 +115,7 @@ func Init(address string, prefix string) {
 	Prefix = prefix
 	consulClient, err := api.NewClient(&api.Config{Address: address})
 	if err != nil {
-		entry.WithError(err).Fatal("consul connect failed")
+		entry.WithError(err).Panic("consul connect failed")
 	}
 	KV = consulClient.KV()
 	Catalog = consulClient.Catalog()

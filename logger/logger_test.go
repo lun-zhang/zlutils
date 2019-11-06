@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"github.com/aws/aws-xray-sdk-go/xray"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -102,4 +103,17 @@ func TestInitByConsul(t *testing.T) {
 	consul.Init(":8500", "test/service/counter")
 	InitByConsul("log")
 	logrus.Debug("d")
+}
+
+func TestWatchByConsul(t *testing.T) {
+	consul.Init(":8500", "test/service/counter")
+	WatchByConsul("log_watch")
+
+	for {
+		fmt.Println(logrus.GetLevel())
+		time.Sleep(time.Second)
+		logrus.Info("i")
+		logrus.Error("e")
+		logrus.Warn("w")
+	}
 }
