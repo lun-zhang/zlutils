@@ -101,6 +101,21 @@ if 活动已结束 {
 }
 ```
 
+## 输出trace_id方便定位
+如果接口发生少量错误，还能通过过滤error关键字找到日志，但是  
+如果测试同学说调了一次接口，返回是200，ret=0，但是数据逻辑不正确，如何定位到这次请求？  
+那么返回输出trace_id吧([logger包](logger/)已支持trace_id，
+[gorm](https://github.com/lun-zhang/gorm/tree/v1.13.3)打印日志时也写入了trace_id，如何使用参考[mysql包](mysql/))： 
+```json
+{
+    "ret": 0,
+    "msg": "success",
+    "trace_id": "1-5dc3c17c-2ffcc981d21a5cf13698baea",
+    "data": 1
+}
+```
+由于trace_id也算敏感信息，因此用code.MidRespWithTraceId中间件来控制指定接口是否输出（同code.MidRespWithErr）
+
 # TODO
 将错误码改成接口，以实现不同结构的错误码，例如
 ```json
