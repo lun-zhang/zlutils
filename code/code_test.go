@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"os"
 	"testing"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/xray"
 )
 
 func TestT(t *testing.T) {
@@ -82,15 +83,24 @@ func TestWrapSend(t *testing.T) {
 }
 
 func TestMidRespWithErr(t *testing.T) {
-	gin.SetMode(gin.ReleaseMode) //这一行注释掉后，app会带上err信息
+	//gin.SetMode(gin.ReleaseMode) //这一行注释掉后，app会带上err信息
 	router := gin.New()
 	router.GET("no", e) //默认任何时候都不显示err信息
-	app := router.Group("app", MidRespWithErr(true))
-	app.GET("", e)
-	rpc := router.Group("rpc", MidRespWithErr(false))
-	rpc.GET("", e)
+	router.Group("app", MidRespWithErr(true)).GET("", e)
+	router.Group("rpc", MidRespWithErr(false)).GET("", e)
 	router.Run(":11123")
 }
+
+func TestMidRespWithTraceId(t *testing.T) {
+	gin.SetMode(gin.ReleaseMode) //这一行注释掉后，app会带上trace_id
+	router := gin.New()
+	router.Use(xray.Mid("zlutils", nil, nil, nil))
+	router.GET("no", info) //默认任何时候都不显示trace_id
+	router.Group("app", MidRespWithTraceId(true)).GET("", info)
+	router.Group("rpc", MidRespWithTraceId(false)).GET("", info)
+	router.Run(":11124")
+}
+func info(c *gin.Context) { Send(c, 1, nil) }
 
 func pj(i interface{}) {
 	b, _ := json.Marshal(i)

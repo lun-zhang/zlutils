@@ -6,14 +6,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/xray"
 	"zlutils/misc"
 )
 
 type Code struct {
-	Ret    int    `json:"ret"`
-	Msg    string `json:"msg"`
-	msgMap MLS    `json:"-"` //多语言的msg
-	Err    error  `json:"-"` //真实的err，用于debug返回
+	Ret     int    `json:"ret"`
+	Msg     string `json:"msg"`
+	msgMap  MLS    `json:"-"`                  //多语言的msg
+	Err     error  `json:"-"`                  //真实的err，用于debug返回
+	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回
 }
 
 //复制一份，否则线程竞争
@@ -129,18 +131,30 @@ func WrapSend(f func(c *gin.Context) (resp interface{}, err error)) gin.HandlerF
 	}
 }
 
-const keyRespWithErr = "_key_resp_show_err"
+const (
+	keyRespWithErr     = "_key_resp_show_err"
+	keyRespWithTraceId = "_key_resp_trace_id"
+)
 
 //使用此中间件的接口，输出带上err信息
 //closeInRelease=true时候，则不在正式环境输出，其他环境输出
 //例如app接口，正式环境不输出，测试环境输出，则设置closeInRelease=true
 //admin、rpc接口任何环境都输出，则设置closeInRelease=false
 func MidRespWithErr(closeInRelease bool) gin.HandlerFunc {
+	return midMidRespWith(closeInRelease, keyRespWithErr)
+}
+
+//使用此中间件，输出带上trace_id
+func MidRespWithTraceId(closeInRelease bool) gin.HandlerFunc {
+	return midMidRespWith(closeInRelease, keyRespWithTraceId)
+}
+
+func midMidRespWith(closeInRelease bool, key string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if closeInRelease && gin.Mode() == gin.ReleaseMode {
 			return
 		}
-		c.Set(keyRespWithErr, 1) //数字没啥意义
+		c.Set(key, 1) //数字没啥意义
 	}
 }
 
@@ -196,6 +210,9 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 				code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
 			}
 		}
+	}
+	if _, ok := c.Get(keyRespWithTraceId); ok {
+		code.TraceId = xray.GetTraceId(c.Request.Context())
 	}
 
 	if code.Ret != 0 || //不是成功就不反回data
