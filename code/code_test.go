@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"os"
 	"testing"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/xray"
+	"zlutils/xray"
 )
 
 func TestT(t *testing.T) {

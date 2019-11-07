@@ -6,8 +6,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/xray"
 	"zlutils/misc"
+	"zlutils/xray"
 )
 
 type Code struct {
