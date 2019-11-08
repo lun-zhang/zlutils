@@ -8,6 +8,7 @@ import (
 	"testing"
 	"zlutils/code"
 	"zlutils/guard"
+	_ "zlutils/logger"
 )
 
 func TestMid(t *testing.T) {
@@ -83,4 +84,17 @@ func mustGetTraceId(ctx context.Context, dep int, initTraceId string) (err error
 	}
 
 	return mustGetTraceId(ctx, dep+1, initTraceId)
+}
+
+func TestPanic(t *testing.T) {
+	guard.DoBeforeCtx = DoBeforeCtx
+	guard.DoAfter = DoAfter
+	ctx, _ := xray.BeginSegment(context.TODO(), "test")
+	p(ctx)
+}
+
+func p(ctx context.Context) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+
+	panic(1)
 }
