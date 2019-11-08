@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/xray"
+	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
+	"zlutils/code"
 	"zlutils/guard"
 	"zlutils/logger"
 	zt "zlutils/time"
@@ -170,4 +172,24 @@ func TestVali(t *testing.T) {
 		Method: "GET",
 		Url:    "http://a.com?a=1&b=c=a",
 	}))
+}
+
+func TestCode(t *testing.T) {
+	router := gin.New()
+
+	router.GET("rpc/code", code.MidRespWithErr(false),
+		func(c *gin.Context) {
+			req := Request{
+				Config: Config{
+					Url:    "http://localhost:12345/code/multi",
+					Method: http.MethodGet,
+				},
+			}
+			var resp struct {
+				Pass
+			}
+			err := req.Do(ctx, &resp)
+			code.Send(c, 1, err)
+		})
+	router.Run(":12346")
 }

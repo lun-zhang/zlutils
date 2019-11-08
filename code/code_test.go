@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"os"
 	"testing"
+	"zlutils/logger"
 	"zlutils/xray"
 )
 
@@ -131,13 +133,17 @@ func TestAddNoEn(t *testing.T) {
 }
 
 func TestMultiLang(t *testing.T) {
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	co := Add(1, MLS{
 		"en": "e",
 		"zh": "中",
 	})
+	SetDefaultSplit(". ")
 	r := gin.New()
-	r.Group("", MidRespWithErr(false)).
-		GET("code/multi", func(c *gin.Context) {
+	r.GET("code/multi",
+		MidRespWithErr(false),
+		logger.MidDebug(),
+		func(c *gin.Context) {
 			Send(c, nil, co.WithErrorf("with"))
 		})
 	r.Run(":12345")

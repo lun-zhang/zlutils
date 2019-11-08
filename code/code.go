@@ -6,17 +6,45 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
+	"strings"
 	"zlutils/misc"
 	"zlutils/xray"
 )
 
+//默认前缀，不可被任何人显示使用，用于当忘记设置时排查
+const defaultCodePrefix = 1000000
+
+//错误码前缀，wiki维护，目前是个默认值
+var codePrefix = defaultCodePrefix
+
+//服务自己用的错误码上限
+const localCodeLast = 100000
+
+func SetCodePrefix(prefix int) {
+	if codePrefix < defaultCodePrefix {
+		logrus.Panicf("code prefix:%d must bigger than %d", prefix, defaultCodePrefix)
+	}
+	codePrefix = prefix
+}
+
+/*
+rpc拓传错误码和错误信息
+目前，我的rpc接口会返回错误的敏感信息，其他人的接口未返回
+因此调我rpc接口的服务，不可把敏感信息传出
+由于未统一错误码，所以服务之间有相同的错误码，这些错误码不可透传
+公共错误码，服务之间不可相同，
+*/
+
 type Code struct {
-	Ret    int    `json:"ret"`
-	Msg    string `json:"msg"`
-	msgMap MLS    `json:"-"` //多语言的msg
-	Err    error  `json:"-"` //真实的err，用于debug返回
+	//Version string `json:"version"`//版本没用啊，服务会同时返回旧错误码和新的
+	Ret int    `json:"ret"`
+	Msg string `json:"msg"`
 	//跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
 	TraceId string `json:"trace_id,omitempty"`
+	msgMap  MLS    //多语言的msg
+	//Err改成err应当从v7升级到v8，但是v8还有很多需要改动的，所以既然目前没人用这个字段，因此这里直接改了
+	err   error  //真实的err，用于debug返回
+	split string //分割符
 }
 
 //复制一份，否则线程竞争
@@ -36,16 +64,31 @@ func (code Code) cloneByLang(lang string) Code {
 }
 
 func (code Code) WithError(err error) Code {
-	code.Err = err
+	code.err = err
 	return code
 }
 func (code Code) WithErrorf(format string, a ...interface{}) Code {
 	return code.WithError(fmt.Errorf(format, a...))
 }
 
+var defaultSplit = ": "
+
+func SetDefaultSplit(split string) {
+	if split == "" {
+		logrus.Panicf("split cant empty")
+	}
+	defaultSplit = split
+}
+
+//NOTE: split不可是msg的子串，否则会在Send函数中被替换成DefaultSplit
+func (code Code) WithSplit(split string) Code {
+	code.split = split
+	return code
+}
+
 func (code Code) Error() string {
-	if code.Err != nil {
-		return code.Err.Error()
+	if code.err != nil {
+		return code.err.Error()
 	}
 	msg := code.Msg
 	if msg == "" {
@@ -66,7 +109,7 @@ type MLS map[string]string
 //如果msg是string，则当做英语
 //如果msg是map，那么会复制一份，所以可以放心不会被修改
 //如果msg是其他类型则panic
-func Add(ret int, msg interface{}) (code Code) {
+func Add(retGlobal int, msg interface{}) (code Code) {
 	var msgMap MLS
 	switch msg := msg.(type) {
 	case string:
@@ -81,7 +124,21 @@ func Add(ret int, msg interface{}) (code Code) {
 	default:
 		logrus.Panicf("invalid msg type:%s", reflect.TypeOf(msg))
 	}
-	return add(ret, msgMap)
+	return add(retGlobal, msgMap)
+}
+
+//由于项目的日志/监控中可能充斥者各个服务的ret，因此必须在Add时候，就把前缀填充
+//尝试填充前缀
+//0不填充
+//已填充的不再填充
+func AddLocal(retLocal int, msg interface{}) (code Code) {
+	switch {
+	case retLocal > 0 && retLocal < localCodeLast:
+		retLocal += codePrefix
+	case retLocal < 0 && retLocal > -localCodeLast:
+		retLocal -= codePrefix
+	}
+	return Add(retLocal, msg)
 }
 
 func add(ret int, msgMap MLS) (code Code) {
@@ -203,13 +260,15 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 	}
 	code = code.cloneByLang(lang) //复制，避免线程竞争
 
-	if code.Err != nil {
+	if code.err != nil {
 		if _, ok := c.Get(keyRespWithErr); ok {
-			if code.Msg == "" {
-				code.Msg = code.Err.Error()
-			} else {
-				code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.Err.Error())
+			//code.Msg如果不是英语，而是用于toast的印地语时，不当输出错误信息
+			//用于toast时，就极有可能包含了分隔符
+			//当然如果你的接口是用于toast，那么肯定不能把rpc的结果直接返给app
+			if code.split == "" || strings.Contains(code.Msg, code.split) {
+				code.split = defaultSplit //可以改成". "
 			}
+			code.Msg = code.Msg + code.split + code.err.Error()
 		}
 	}
 	if _, ok := c.Get(keyRespWithTraceId); ok {
@@ -245,7 +304,7 @@ var (
 	ServerErr      = Add(5000, "server error")
 	ServerErrPainc = Add(5201, "server error") //panic，被recover了
 	ServerErrRedis = Add(5202, "server error") //redis错误
-	ServerErrRpc   = Add(500, "server error")  //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
+	ServerErrRpc   = Add(5203, "server error") //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
 	//客户端错误
 	ClientErr                 = Add(4000, "client error")
 	ClientErrQuery            = Add(4002, "verify query params failed")
