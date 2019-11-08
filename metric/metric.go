@@ -37,15 +37,15 @@ func InitDefaultMetric(projectName string) {
 	)
 
 	RespCounter = func(c *gin.Context) prometheus.Counter {
-		return defaultRespCounter.WithLabelValues(getEndpoint(c))
+		return defaultRespCounter.WithLabelValues(GetEndpoint(c))
 	}
 
 	RespLatency = func(c *gin.Context) prometheus.Observer {
-		return defaultRespLatency.WithLabelValues(getEndpoint(c))
+		return defaultRespLatency.WithLabelValues(GetEndpoint(c))
 	}
 }
 
-func getEndpoint(c *gin.Context) string {
+var GetEndpoint = func(c *gin.Context) string {
 	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
 }
 

@@ -11,11 +11,12 @@ import (
 )
 
 type Code struct {
-	Ret     int    `json:"ret"`
-	Msg     string `json:"msg"`
-	msgMap  MLS    `json:"-"`                  //多语言的msg
-	Err     error  `json:"-"`                  //真实的err，用于debug返回
-	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回
+	Ret    int    `json:"ret"`
+	Msg    string `json:"msg"`
+	msgMap MLS    `json:"-"` //多语言的msg
+	Err    error  `json:"-"` //真实的err，用于debug返回
+	//跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
+	TraceId string `json:"trace_id,omitempty"`
 }
 
 //复制一份，否则线程竞争
@@ -244,7 +245,7 @@ var (
 	ServerErr      = Add(5000, "server error")
 	ServerErrPainc = Add(5201, "server error") //panic，被recover了
 	ServerErrRedis = Add(5202, "server error") //redis错误
-	ServerErrRpc   = Add(5100, "server error") //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
+	ServerErrRpc   = Add(500, "server error")  //调用其他服务错误，可能是本服务传参错误，也可能是远程服务器错误
 	//客户端错误
 	ClientErr                 = Add(4000, "client error")
 	ClientErrQuery            = Add(4002, "verify query params failed")

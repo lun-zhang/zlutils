@@ -57,7 +57,7 @@ func BeforeCtx(ctxp *context.Context) AfterFunc {
 			var err error
 			if r := recover(); r != nil {
 				err = code.ServerErrPainc.WithErrorf("panic: %+v", r)
-				logrus.WithError(err).Error() //一般不在其他地方打
+				logrus.WithContext(*ctxp).WithError(err).Error() //一般不在其他地方打
 				if errp != nil {
 					*errp = err
 				}
