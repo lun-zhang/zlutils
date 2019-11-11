@@ -29,10 +29,10 @@ func InitDefaultMetric(projectName string) {
 	)
 
 	ServerErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return serverErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
+		return serverErrorCounter.WithLabelValues(GetEndpoint(c), getRetLabel(c))
 	}
 	ClientErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return clientErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
+		return clientErrorCounter.WithLabelValues(GetEndpoint(c), getRetLabel(c))
 	}
 }
 
@@ -43,8 +43,8 @@ var GetEndpoint = func(c *gin.Context) string {
 	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
 }
 
-func getRet(c *gin.Context) string {
-	ret, ok := GetRet(c)
+func getRetLabel(c *gin.Context) string {
+	ret, ok := getRet(c)
 	if !ok {
 		if c.Writer.Status() == http.StatusNotFound {
 			ret = ClientErr404.Ret
