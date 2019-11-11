@@ -92,7 +92,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		//处理请求参数
 		in := []reflect.Value{reflect.ValueOf(ctx)}
 		if reqType != nil {
-			reqValue, err := ShouldBindReq(c, reqType)
+			reqValue, err := shouldBindReq(c, reqType)
 			if err != nil {
 				entry.WithError(err).Warn()
 				code.Send(c, nil, err)
@@ -127,8 +127,8 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 }
 
-//如果你只是想解析请求结构，那就用这个吧！
-func ShouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
+//虽然应当由v7改成v8，但是没人用就算了
+func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
 	reqValue = reflect.New(reqType).Elem()
 
 	if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
