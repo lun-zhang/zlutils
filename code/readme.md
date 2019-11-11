@@ -75,7 +75,7 @@ if errClient != nil {
 }
 ```
 
-# 只能收到verify body params failed或者server error，能否返回更多信息帮助调用者排查问题？
+## 只能收到verify body params failed或者server error，能否返回更多信息帮助调用者排查问题？
 通常在第一次调用他人接口的时候，会因为参数错误而调不通，如果只是返回了verify body params failed这样的错误信息，
 还需要自己去对着文档一个一个看字段类型、是否必传等等，或者直接让服务器同学过来看，那服务器同学如果把请求打印日志了，倒也可以看出个问题，
 但是如果在测试阶段，把错误信息，例如哪个字段解析失败等信息返给调用者便可以：
@@ -84,7 +84,7 @@ if errClient != nil {
 
 对于server error的服务器错误，也返回详细信息，方便服务器同学自己定位问题（例如gorm插入不存在的字段，便可知自己忘记扩列了），而不必再查日志  
 在调用code.Send的时候，只有识别到目前处于开发/测试阶段 才会返回详细的错误信息，因为有些错误信息非常敏感，可能危及服务器安全，因此正式环境不会返回详细错误信息
-## 如何携带详细信息
+### 如何携带详细信息
 WithError(error)和WithErrorf(format,args...)函数满足了用户添加详细的错误信息  
 例如现在有个活动服务，定义了一个活动不存的的错误码，这是个客户端错误
 ```go
@@ -101,7 +101,7 @@ if 活动已结束 {
 }
 ```
 
-## 输出trace_id方便定位
+### 输出trace_id方便定位
 如果接口发生少量错误，还能通过过滤error关键字找到日志，但是  
 如果测试同学说调了一次接口，返回是200，ret=0，但是数据逻辑不正确，如何定位到这次请求？  
 那么返回输出trace_id吧([logger包](logger/)已支持trace_id，
@@ -116,8 +116,18 @@ if 活动已结束 {
 ```
 由于trace_id也算敏感信息，因此用code.MidRespWithTraceId中间件来控制指定接口是否输出（同code.MidRespWithErr）
 
-# TODO
-将错误码改成接口，以实现不同结构的错误码，例如
+## msg支持多语言
+当ret!=0时，客户端将msg作为toast内容弹出，支持多语言：
+```go
+var codeClientErrTaskLimitTotal = code.Add(4101, code.MLS{
+    code.LangEn: "Sorry, today's special are all sold-out. Pls come early tomorrow.",
+    code.LangHi: "क्षमा करें, आज का विशेष बोनस सभी बिक चुके हैं। कल जल्दी आना।",
+})
+```
+
+## TODO
+### 将错误码改成接口
+以实现不同结构的错误码，例如
 ```json
 {
   "code":0,
@@ -125,3 +135,6 @@ if 活动已结束 {
   "data":业务数据
 }
 ```
+### 将错误码配置在consul
+1. msg支持多语言后，如果经常改动，需要放在consul
+2. 错误码写在wiki似乎不好维护
