@@ -39,10 +39,7 @@ func getSampleQuery(query string) string {
 	return strings.Replace(query, "?,", "", -1) //TODO: 改成更好的做法，把IN(?,...)替换成IN(...)
 }
 
-type fqac func(query string, args ...interface{}) prometheus.Counter
-type fqao func(query string, args ...interface{}) prometheus.Observer
-
 var (
-	MetricCounter fqac
-	MetricLatency fqao
+	MetricCounter func(query string, args ...interface{}) prometheus.Counter
+	MetricLatency func(query string, args ...interface{}) prometheus.Observer
 )

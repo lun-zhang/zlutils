@@ -12,8 +12,11 @@ var (
 	HistoryBuckets = []float64{10., 20., 30., 50., 80., 100., 200., 300., 500., 1000., 2000., 3000.}
 )
 
-func InitDefaultMetric(projectName string) {
-	//请求次数
+var GetEndpoint = func(c *gin.Context) string {
+	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
+}
+
+func MidRespCounterLatency(projectName string) gin.HandlerFunc {
 	defaultRespCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_requests_total", projectName),
@@ -36,59 +39,12 @@ func InitDefaultMetric(projectName string) {
 		defaultRespLatency,
 	)
 
-	RespCounter = func(c *gin.Context) prometheus.Counter {
-		return defaultRespCounter.WithLabelValues(GetEndpoint(c))
-	}
-
-	RespLatency = func(c *gin.Context) prometheus.Observer {
-		return defaultRespLatency.WithLabelValues(GetEndpoint(c))
-	}
-}
-
-var GetEndpoint = func(c *gin.Context) string {
-	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
-}
-
-var (
-	RespCounter fcc
-	RespLatency fco
-)
-
-func MidRespCounterErr(isServerErr, isClientErr fcb,
-	serverErrCounter, clientErrCounter fcc) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Next()
-		statusCode := c.Writer.Status()
-		if statusCode >= 400 && statusCode < 500 ||
-			isClientErr != nil && isClientErr(c) {
-			if clientErrCounter != nil {
-				clientErrCounter(c).Inc()
-			}
-		}
-		if statusCode >= 500 && statusCode < 600 ||
-			isServerErr != nil && isServerErr(c) {
-			if serverErrCounter != nil {
-				serverErrCounter(c).Inc()
-			}
-		}
-	}
-}
-
-type fcb func(*gin.Context) bool
-type fcc func(*gin.Context) prometheus.Counter
-type fco func(*gin.Context) prometheus.Observer
-
-func MidRespCounterLatency() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
 		latency := time.Now().Sub(start)
-		if RespLatency != nil {
-			RespLatency(c).Observe(latency.Seconds() * 1000)
-		}
-		if RespCounter != nil {
-			RespCounter(c).Inc()
-		}
+		defaultRespLatency.WithLabelValues(GetEndpoint(c)).Observe(latency.Seconds() * 1000)
+		defaultRespCounter.WithLabelValues(GetEndpoint(c)).Inc()
 	}
 }
 

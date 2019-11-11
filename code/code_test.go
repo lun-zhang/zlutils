@@ -36,11 +36,11 @@ func TestRespIsErr(t *testing.T) {
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 
-	c.Set(KeyRet, ClientErr.Ret)
+	c.Set(keyRet, ClientErr.Ret)
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 
-	c.Set(KeyRet, ServerErr.Ret)
+	c.Set(keyRet, ServerErr.Ret)
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 }

@@ -11,6 +11,14 @@ import (
 	"zlutils/xray"
 )
 
+//type Interface interface {
+//	Code()
+//	Message()
+//	Error() string
+//	WithError(err error) Interface
+//	WithErrorf(format string, a ...interface{}) Interface
+//}
+
 //默认前缀，不可被任何人显示使用，用于当忘记设置时排查
 const defaultCodePrefix = 1000000
 
@@ -128,15 +136,15 @@ func Add(retGlobal int, msg interface{}) (code Code) {
 }
 
 //由于项目的日志/监控中可能充斥者各个服务的ret，因此必须在Add时候，就把前缀填充
-//尝试填充前缀
-//0不填充
-//已填充的不再填充
+//填充局部码，只能在
 func AddLocal(retLocal int, msg interface{}) (code Code) {
 	switch {
 	case retLocal > 0 && retLocal < localCodeLast:
 		retLocal += codePrefix
 	case retLocal < 0 && retLocal > -localCodeLast:
 		retLocal -= codePrefix
+	default:
+		logrus.Panicf("invalid retLocal:%d", retLocal)
 	}
 	return Add(retLocal, msg)
 }
@@ -161,13 +169,30 @@ type result struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
-const KeyRet = "_key_ret"
+const keyRet = "_key_ret"
 
-func IsServerErr(ret int) bool {
-	return ret >= 5000 && ret < 6000
+func isServerErr(ret int) bool {
+	//我的旧的
+	if ret >= 5000 && ret < 6000 {
+		return true
+	}
+	//统一新的
+	if ret > 0 {
+		return true
+	}
+
+	return false
 }
-func IsClientErr(ret int) bool {
-	return ret >= 4000 && ret < 5000
+func isClientErr(ret int) bool {
+	//我的旧的
+	if ret >= 4000 && ret < 5000 {
+		return true
+	}
+	//统一新的
+	if ret < 0 {
+		return true
+	}
+	return false
 }
 
 const (
@@ -198,7 +223,7 @@ func midMidRespWith(closeInRelease bool, key string) gin.HandlerFunc {
 }
 
 func getRet(c *gin.Context) (int, bool) {
-	if v, ok := c.Get(KeyRet); ok {
+	if v, ok := c.Get(keyRet); ok {
 		if ret, ok := v.(int); ok {
 			return ret, ok
 		}
@@ -207,15 +232,21 @@ func getRet(c *gin.Context) (int, bool) {
 }
 
 func RespIsServerErr(c *gin.Context) bool {
+	if statusCode := c.Writer.Status(); statusCode >= 500 && statusCode < 600 {
+		return true
+	}
 	if ret, ok := getRet(c); ok {
-		return IsServerErr(ret)
+		return isServerErr(ret)
 	}
 	return false
 }
 
 func RespIsClientErr(c *gin.Context) bool {
+	if statusCode := c.Writer.Status(); statusCode >= 400 && statusCode < 500 {
+		return true
+	}
 	if ret, ok := getRet(c); ok {
-		return IsClientErr(ret)
+		return isClientErr(ret)
 	}
 	return false
 }
@@ -256,7 +287,7 @@ func Send(c *gin.Context, data interface{}, err error) {
 		misc.IsNil(data) { //如果data设为nil则也不返回
 		data = nil
 	}
-	c.Set(KeyRet, code.Ret) //保存ret用于metrics
+	c.Set(keyRet, code.Ret) //保存ret用于metrics
 	c.JSON(http.StatusOK, result{
 		Code: code,
 		Data: data,

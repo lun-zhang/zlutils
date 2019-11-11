@@ -8,32 +8,8 @@ import (
 	"strconv"
 )
 
-func InitDefaultMetric(projectName string) {
-	serverErrorCounter := prometheus.NewCounterVec( //服务器错误，用于alert
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_server_error_total", projectName),
-			Help: "Total Server Error counts",
-		},
-		defaultLabelNames,
-	)
-	clientErrorCounter := prometheus.NewCounterVec( //客户端错误
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_client_error_total", projectName),
-			Help: "Total Client Error counts",
-		},
-		defaultLabelNames,
-	)
-	prometheus.MustRegister(
-		serverErrorCounter,
-		clientErrorCounter,
-	)
-
-	ServerErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return serverErrorCounter.WithLabelValues(GetEndpoint(c), getRetLabel(c))
-	}
-	ClientErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return clientErrorCounter.WithLabelValues(GetEndpoint(c), getRetLabel(c))
-	}
+func getCounter(c *gin.Context, cv *prometheus.CounterVec) prometheus.Counter {
+	return cv.WithLabelValues(GetEndpoint(c), getRetLabel(c))
 }
 
 var defaultLabelNames = []string{"endpoint", "ret"}
@@ -55,7 +31,33 @@ func getRetLabel(c *gin.Context) string {
 	return strconv.Itoa(ret)
 }
 
-var (
-	ServerErrorCounter func(*gin.Context) prometheus.Counter
-	ClientErrorCounter func(*gin.Context) prometheus.Counter
-)
+func MidRespCounterErr(projectName string) gin.HandlerFunc {
+	serverErrorCounter := prometheus.NewCounterVec( //服务器错误，用于alert
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_server_error_total", projectName),
+			Help: "Total Server Error counts",
+		},
+		defaultLabelNames,
+	)
+	clientErrorCounter := prometheus.NewCounterVec( //客户端错误
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_client_error_total", projectName),
+			Help: "Total Client Error counts",
+		},
+		defaultLabelNames,
+	)
+	prometheus.MustRegister(
+		serverErrorCounter,
+		clientErrorCounter,
+	)
+	return func(c *gin.Context) {
+		c.Next()
+
+		if RespIsClientErr(c) {
+			getCounter(c, clientErrorCounter).Inc()
+		}
+		if RespIsServerErr(c) {
+			getCounter(c, serverErrorCounter).Inc()
+		}
+	}
+}
