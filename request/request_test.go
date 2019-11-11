@@ -174,7 +174,7 @@ func TestVali(t *testing.T) {
 	}))
 }
 
-func TestCode(t *testing.T) {
+func TestPass(t *testing.T) {
 	router := gin.New()
 
 	router.GET("rpc/code", code.MidRespWithErr(false),
@@ -186,7 +186,7 @@ func TestCode(t *testing.T) {
 				},
 			}
 			var resp struct {
-				Pass
+				RespPass
 			}
 			err := req.Do(ctx, &resp)
 			code.Send(c, 1, err)
