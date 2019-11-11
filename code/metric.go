@@ -14,14 +14,14 @@ func InitDefaultMetric(projectName string) {
 			Name: fmt.Sprintf("%s_server_error_total", projectName),
 			Help: "Total Server Error counts",
 		},
-		[]string{"endpoint", "ret"},
+		defaultLabelNames,
 	)
 	clientErrorCounter := prometheus.NewCounterVec( //客户端错误
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_client_error_total", projectName),
 			Help: "Total Client Error counts",
 		},
-		[]string{"endpoint", "ret"},
+		defaultLabelNames,
 	)
 	prometheus.MustRegister(
 		serverErrorCounter,
@@ -29,14 +29,17 @@ func InitDefaultMetric(projectName string) {
 	)
 
 	ServerErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return serverErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
+		return serverErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
 	}
 	ClientErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return clientErrorCounter.WithLabelValues(getEndpoint(c), getRet(c))
+		return clientErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
 	}
 }
 
-func getEndpoint(c *gin.Context) string {
+var defaultLabelNames = []string{"endpoint", "ret"}
+
+//有些有path参数的接口，需要覆盖此函数
+var GetEndpoint = func(c *gin.Context) string {
 	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
 }
 
