@@ -156,7 +156,7 @@ func add(ret int, msgMap MLS) (code Code) {
 	return code
 }
 
-type Result struct {
+type result struct {
 	Code
 	Data interface{} `json:"data,omitempty"`
 }
@@ -168,25 +168,6 @@ func IsServerErr(ret int) bool {
 }
 func IsClientErr(ret int) bool {
 	return ret >= 4000 && ret < 5000
-}
-
-type Context struct {
-	*gin.Context
-}
-
-type HandelFunc func(*Context)
-
-func Wrap(f HandelFunc) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		f(&Context{c})
-	}
-}
-
-func WrapSend(f func(c *gin.Context) (resp interface{}, err error)) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		resp, err := f(c)
-		Send(c, resp, err)
-	}
 }
 
 const (
@@ -216,7 +197,7 @@ func midMidRespWith(closeInRelease bool, key string) gin.HandlerFunc {
 	}
 }
 
-func GetRet(c *gin.Context) (int, bool) {
+func getRet(c *gin.Context) (int, bool) {
 	if v, ok := c.Get(KeyRet); ok {
 		if ret, ok := v.(int); ok {
 			return ret, ok
@@ -226,24 +207,20 @@ func GetRet(c *gin.Context) (int, bool) {
 }
 
 func RespIsServerErr(c *gin.Context) bool {
-	if ret, ok := GetRet(c); ok {
+	if ret, ok := getRet(c); ok {
 		return IsServerErr(ret)
 	}
 	return false
 }
 
 func RespIsClientErr(c *gin.Context) bool {
-	if ret, ok := GetRet(c); ok {
+	if ret, ok := getRet(c); ok {
 		return IsClientErr(ret)
 	}
 	return false
 }
 
-func (c *Context) Send(data interface{}, err error) {
-	Send(c.Context, data, err)
-}
-
-var Send = func(c *gin.Context, data interface{}, err error) {
+func Send(c *gin.Context, data interface{}, err error) {
 	var code Code
 	if err == nil {
 		code = Success
@@ -280,7 +257,7 @@ var Send = func(c *gin.Context, data interface{}, err error) {
 		data = nil
 	}
 	c.Set(KeyRet, code.Ret) //保存ret用于metrics
-	c.JSON(http.StatusOK, Result{
+	c.JSON(http.StatusOK, result{
 		Code: code,
 		Data: data,
 	})
