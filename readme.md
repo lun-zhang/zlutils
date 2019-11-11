@@ -62,3 +62,13 @@
 2. [每个函数都用defer recover保护，将panic转成err，怎样写最简单](guard/)
 5. [我想在consul上配个缓存时间为5分钟，得先转成time.Duration类型的300000000000纳秒，不能像nginx一样配个"5m"吗？](time/)
 
+# 如何使用此工具包
+go.mod中用replace
+```
+require zlutils v0.0.0
+replace zlutils v0.0.0 => xlbj-gitlab.xunlei.cn/oversea/zlutils/v7 v7 //go build时会找到v7最新版本
+```
+代码中这样导入：`import "zlutils/time"`，这样做的好处是：
+1. ***避免同时引入本项目的不同版本***，导致类型/变量值不匹配
+
+坏处是：
