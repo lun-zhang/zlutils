@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"testing"
 	"time"
-	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/metric"
 	"zlutils/code"
 	"zlutils/guard"
 	"zlutils/logger"
+	"zlutils/metric"
 	zt "zlutils/time"
 	zx "zlutils/xray"
 )

@@ -1,4 +1,4 @@
-module xlbj-gitlab.xunlei.cn/oversea/zlutils/v7
+module xlbj-gitlab.xunlei.cn/oversea/zlutils/v8
 
 go 1.12
 
