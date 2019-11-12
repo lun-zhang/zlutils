@@ -21,6 +21,14 @@ import (
 
 type MSI map[string]interface{}
 
+func (m MSI) Clone() MSI {
+	clone := MSI{}
+	for k, v := range m {
+		clone[k] = v
+	}
+	return clone
+}
+
 //用于consul配置
 type Config struct {
 	Method string        `json:"method" validate:"oneof= GET POST PUT DELETE"`
