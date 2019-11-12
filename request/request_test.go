@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"xlbj-gitlab.xunlei.cn/oversea/zlutils/v7/metric"
 	"zlutils/code"
 	"zlutils/guard"
 	"zlutils/logger"
@@ -173,10 +174,10 @@ func TestVali(t *testing.T) {
 		Url:    "http://a.com?a=1&b=c=a",
 	}))
 }
-
 func TestPass(t *testing.T) {
 	router := gin.New()
-
+	router.Use(code.MidRespCounterErr("rpc"))
+	router.GET("rpc/metrics", metric.Metrics)
 	router.GET("rpc/code", code.MidRespWithErr(false),
 		func(c *gin.Context) {
 			req := Request{

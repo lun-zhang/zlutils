@@ -20,13 +20,13 @@ import (
 //}
 
 //默认前缀，不可被任何人显示使用，用于当忘记设置时排查
-const defaultCodePrefix = 1000000
+const defaultCodePrefix = 1000000 //1e6
 
 //错误码前缀，wiki维护，目前是个默认值
 var codePrefix = defaultCodePrefix
 
-//服务自己用的错误码上限
-const localCodeLast = 100000
+//服务自己用的错误码上限，因此最大为99999
+const localCodeLast = 100000 //1e5
 
 func SetCodePrefix(prefix int) {
 	if codePrefix < defaultCodePrefix {
@@ -44,15 +44,21 @@ rpc拓传错误码和错误信息
 */
 
 type Code struct {
-	//Version string `json:"version"`//版本没用啊，服务会同时返回旧错误码和新的
-	Ret int    `json:"ret"`
-	Msg string `json:"msg"`
-	//跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
-	TraceId string `json:"trace_id,omitempty"`
-	msgMap  MLS    //多语言的msg
-	//Err改成err应当从v7升级到v8，但是v8还有很多需要改动的，所以既然目前没人用这个字段，因此这里直接改了
-	err   error  //真实的err，用于debug返回
-	split string //分割符
+	Ret     int    `json:"ret"`
+	Msg     string `json:"msg"`
+	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
+	//Help    string `json:"help,omitempty"`     //点击此链接调转到错误详情,限制内网
+
+	msgMap MLS    //多语言的msg
+	err    error  //真实的err，用于debug返回
+	split  string //分割符
+	isPass bool   //是否是rpc透传码
+}
+
+//是rpc透传码
+func (code Code) WithPass() Code {
+	code.isPass = true
+	return code
 }
 
 //复制一份，否则线程竞争
@@ -169,7 +175,10 @@ type result struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
-const keyRet = "_key_ret"
+const (
+	keyRet    = "_key_ret"
+	keyIsPass = "_key_is_pass"
+)
 
 func isServerErr(ret int) bool {
 	//我的旧的
@@ -218,7 +227,7 @@ func midMidRespWith(closeInRelease bool, key string) gin.HandlerFunc {
 		if closeInRelease && gin.Mode() == gin.ReleaseMode {
 			return
 		}
-		c.Set(key, 1) //数字没啥意义
+		c.Set(key, struct{}{})
 	}
 }
 
@@ -249,6 +258,11 @@ func RespIsClientErr(c *gin.Context) bool {
 		return isClientErr(ret)
 	}
 	return false
+}
+
+func respIsPassErr(c *gin.Context) bool {
+	_, ok := c.Get(keyIsPass)
+	return ok
 }
 
 func Send(c *gin.Context, data interface{}, err error) {
@@ -286,6 +300,9 @@ func Send(c *gin.Context, data interface{}, err error) {
 	if code.Ret != 0 || //不是成功就不反回data
 		misc.IsNil(data) { //如果data设为nil则也不返回
 		data = nil
+	}
+	if code.isPass {
+		c.Set(keyIsPass, struct{}{})
 	}
 	c.Set(keyRet, code.Ret) //保存ret用于metrics
 	c.JSON(http.StatusOK, result{

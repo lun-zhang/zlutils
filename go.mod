@@ -6,8 +6,7 @@ require (
 	github.com/aws/aws-xray-sdk-go v1.0.0-rc.5.0.20180720202646-037b81b2bf76
 	github.com/fvbock/endless v0.0.0-20170109170031-447134032cb6
 	github.com/gin-gonic/gin v1.4.0
-	github.com/go-playground/locales v0.13.0 // indirect
-	github.com/go-playground/universal-translator v0.16.0 // indirect
+	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator v9.29.1+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gosexy/to v0.0.0-20141221203644-c20e083e3123

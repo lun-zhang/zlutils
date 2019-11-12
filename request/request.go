@@ -189,7 +189,7 @@ func (m RespPass) Check() error {
 	}
 	e := m.Msg[idx+len(sp):]
 	m.Msg = msg //将错误详情从msg剔出
-	return code.Code(m).WithErrorf(e).WithSplit(sp)
+	return code.Code(m).WithErrorf(e).WithSplit(sp).WithPass()
 }
 
 //从logger里复制过来的

@@ -123,7 +123,7 @@ func TestAddNoEn(t *testing.T) {
 
 func TestMultiLang(t *testing.T) {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
-	co := Add(1, MLS{
+	co := AddLocal(1, MLS{
 		"en": "e",
 		"zh": "中",
 	})
