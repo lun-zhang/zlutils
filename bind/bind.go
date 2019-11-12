@@ -128,46 +128,82 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 }
 
+var bindFuncs = []struct {
+	name     string
+	bindFunc func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error)
+}{
+	{
+		name: ReqFieldNameBody,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if _, ok := tagMap[TagReuseBody]; ok {
+				err = c.ShouldBindBodyWith(obj, binding.JSON)
+			} else {
+				err = c.ShouldBindJSON(obj)
+			}
+			if err != nil {
+				err = code.ClientErrBody.WithError(err)
+				return
+			}
+			return
+		},
+	},
+
+	{
+		name: ReqFieldNameQuery,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = c.ShouldBindQuery(obj); err != nil {
+				err = code.ClientErrQuery.WithError(err)
+				return
+			}
+			return
+		},
+	},
+	{
+		name: ReqFieldNameUri,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = c.ShouldBindUri(obj); err != nil {
+				err = code.ClientErrUri.WithError(err)
+				return
+			}
+			return
+		},
+	},
+	{
+		name: ReqFieldNameHeader,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = ShouldBindHeader(c.Request.Header, obj); err != nil {
+				err = code.ClientErrHeader.WithError(err)
+				return
+			}
+			return
+		},
+	},
+}
+
 func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
 	reqValue = reflect.New(reqType).Elem()
 
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameBody); ok {
-		fieldValuePtr := reflect.New(fieldType.Type).Interface()
-		if tagHas(fieldType.Tag, TagReuseBody) {
-			err = c.ShouldBindBodyWith(fieldValuePtr, binding.JSON)
-		} else {
-			err = c.ShouldBindJSON(fieldValuePtr)
+	for _, bf := range bindFuncs {
+		if fieldType, ok := reqType.FieldByName(bf.name); ok {
+			fieldValuePtr := reflect.New(fieldType.Type).Interface()
+
+			tagMap := map[string]struct{}{}
+			for _, tag := range strings.Split(fieldType.Tag.Get(TagKey), ",") {
+				tagMap[tag] = struct{}{}
+			}
+
+			if err = bf.bindFunc(c, fieldValuePtr, tagMap); err != nil {
+				if _, ok := tagMap[TagIgnoreError]; ok {
+					err = nil //如果发生了错误，但是有ignore_error标签，那么就继续，也没有warn日志
+				} else {
+					return
+				}
+			} else {
+				reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
+			}
 		}
-		if err != nil {
-			err = code.ClientErrBody.WithError(err)
-			return
-		}
-		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
 	}
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameQuery); ok {
-		fieldValuePtr := reflect.New(fieldType.Type).Interface()
-		if err = c.ShouldBindQuery(fieldValuePtr); err != nil {
-			err = code.ClientErrQuery.WithError(err)
-			return
-		}
-		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
-	}
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameUri); ok {
-		fieldValuePtr := reflect.New(fieldType.Type).Interface()
-		if err = c.ShouldBindUri(fieldValuePtr); err != nil {
-			err = code.ClientErrUri.WithError(err)
-			return
-		}
-		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
-	}
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameHeader); ok {
-		fieldValuePtr := reflect.New(fieldType.Type).Interface()
-		if err = ShouldBindHeader(c.Request.Header, fieldValuePtr); err != nil {
-			err = code.ClientErrHeader.WithError(err)
-			return
-		}
-		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
-	}
+
 	if fieldType, ok := reqType.FieldByName(ReqFieldNameMeta); ok {
 		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c.Keys))
 	}
@@ -191,8 +227,3 @@ const (
 	TagReuseBody   = "reuse_body"
 	TagIgnoreError = "ignore_error"
 )
-
-//TODO: 存到map，避免每个请求找一遍
-func tagHas(tag reflect.StructTag, value string) (ok bool) {
-	return strings.Contains(tag.Get(TagKey), value)
-}
