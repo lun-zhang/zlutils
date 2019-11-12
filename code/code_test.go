@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 	"zlutils/logger"
+	"zlutils/misc"
 	"zlutils/xray"
 )
 
@@ -99,7 +100,7 @@ func pj(i interface{}) {
 }
 
 func TestAdd(t *testing.T) {
-	c1 := Add(1, MLS{
+	c1 := Add(1, MSS{
 		"en": "e",
 		"zh": "中",
 	})
@@ -116,14 +117,14 @@ func TestAddNoEn(t *testing.T) {
 			t.Error("must panic")
 		}
 	}()
-	Add(1, MLS{ //panic
+	Add(1, MSS{ //panic
 		"zh": "中",
 	})
 }
 
 func TestMultiLang(t *testing.T) {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
-	co := AddLocal(1, MLS{
+	co := AddLocal(1, MSS{
 		"en": "e",
 		"zh": "中",
 	})
@@ -139,14 +140,14 @@ func TestMultiLang(t *testing.T) {
 }
 
 func TestAddIsClone(t *testing.T) {
-	msg := MLS{
-		LangEn: "e",
+	msg := MSS{
+		misc.LangEnglish: "e",
 	}
 	co := Add(1, msg)
 	fmt.Println(co.msgMap)
-	msg[LangEn] = "e2"
+	msg[misc.LangEnglish] = "e2"
 	fmt.Println(co.msgMap)
-	if co.msgMap[LangEn] != "e" {
+	if co.msgMap[misc.LangEnglish] != "e" {
 		t.Error("不能被改变")
 	}
 }

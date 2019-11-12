@@ -49,7 +49,7 @@ type Code struct {
 	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
 	//Help    string `json:"help,omitempty"`     //点击此链接调转到错误详情,限制内网
 
-	msgMap MLS    //多语言的msg
+	msgMap MSS    //多语言的msg
 	err    error  //真实的err，用于debug返回
 	split  string //分割符
 	isPass bool   //是否是rpc透传码
@@ -68,7 +68,7 @@ func (code Code) cloneByLang(lang string) Code {
 		return code
 	}
 	//没有则取英语的
-	if msg, ok := code.msgMap[LangEn]; ok {
+	if msg, ok := code.msgMap[misc.LangEnglish]; ok {
 		code.Msg = msg
 		return code
 	}
@@ -106,32 +106,28 @@ func (code Code) Error() string {
 	}
 	msg := code.Msg
 	if msg == "" {
-		msg = code.msgMap[LangEn]
+		msg = code.msgMap[misc.LangEnglish]
 	}
 	return fmt.Sprintf("ret: %d, msg: %s", code.Ret, msg)
 }
 
 var retMap = map[int]struct{}{}
 
-const (
-	LangEn = "en"
-	LangHi = "hi-IN"
-)
-
-type MLS map[string]string
+//并没有自己的方法，所以就当个简写
+type MSS = map[string]string
 
 //如果msg是string，则当做英语
 //如果msg是map，那么会复制一份，所以可以放心不会被修改
 //如果msg是其他类型则panic
 func Add(retGlobal int, msg interface{}) (code Code) {
-	var msgMap MLS
+	var msgMap MSS
 	switch msg := msg.(type) {
 	case string:
-		msgMap = MLS{
-			LangEn: msg, //默认认为是英语
+		msgMap = MSS{
+			misc.LangEnglish: msg, //默认认为是英语
 		}
-	case MLS:
-		msgMap = MLS{}
+	case MSS:
+		msgMap = MSS{}
 		for k, v := range msg {
 			msgMap[k] = v //复制一份避免被修改
 		}
@@ -155,12 +151,12 @@ func AddLocal(retLocal int, msg interface{}) (code Code) {
 	return Add(retLocal, msg)
 }
 
-func add(ret int, msgMap MLS) (code Code) {
+func add(ret int, msgMap MSS) (code Code) {
 	if _, ok := retMap[ret]; ok {
 		panic(fmt.Errorf("ret %d exist", ret)) //NOTE: 禁止传相同的ret
 	}
 	retMap[ret] = struct{}{}
-	if _, ok := msgMap[LangEn]; !ok {
+	if _, ok := msgMap[misc.LangEnglish]; !ok {
 		panic(fmt.Errorf("no english msg")) //必须有英语的msg，空的也允许
 	}
 	code = Code{
