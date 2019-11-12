@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"strings"
 	"zlutils/caller"
 	"zlutils/code"
 )
@@ -92,7 +93,7 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		//处理请求参数
 		in := []reflect.Value{reflect.ValueOf(ctx)}
 		if reqType != nil {
-			reqValue, err := ShouldBindReq(c, reqType)
+			reqValue, err := shouldBindReq(c, reqType)
 			if err != nil {
 				entry.WithError(err).Warn()
 				code.Send(c, nil, err)
@@ -127,52 +128,51 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 }
 
-//如果你只是想解析请求结构，那就用这个吧！
-func ShouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
+func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
 	reqValue = reflect.New(reqType).Elem()
 
-	if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
-		bodyPtr := reflect.New(body.Type()).Interface()
-		if bodyType, _ := reqType.FieldByName(ReqFieldNameBody); bodyType.Tag.Get(TagKey) == TagReuseBody {
-			err = c.ShouldBindBodyWith(bodyPtr, binding.JSON)
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameBody); ok {
+		fieldValuePtr := reflect.New(fieldType.Type).Interface()
+		if tagHas(fieldType.Tag, TagReuseBody) {
+			err = c.ShouldBindBodyWith(fieldValuePtr, binding.JSON)
 		} else {
-			err = c.ShouldBindJSON(bodyPtr)
+			err = c.ShouldBindJSON(fieldValuePtr)
 		}
 		if err != nil {
 			err = code.ClientErrBody.WithError(err)
 			return
 		}
-		body.Set(reflect.ValueOf(bodyPtr).Elem())
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
 	}
-	if query := reqValue.FieldByName(ReqFieldNameQuery); query.IsValid() {
-		queryPtr := reflect.New(query.Type()).Interface()
-		if err = c.ShouldBindQuery(queryPtr); err != nil {
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameQuery); ok {
+		fieldValuePtr := reflect.New(fieldType.Type).Interface()
+		if err = c.ShouldBindQuery(fieldValuePtr); err != nil {
 			err = code.ClientErrQuery.WithError(err)
 			return
 		}
-		query.Set(reflect.ValueOf(queryPtr).Elem())
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
 	}
-	if uri := reqValue.FieldByName(ReqFieldNameUri); uri.IsValid() {
-		uriPtr := reflect.New(uri.Type()).Interface()
-		if err = c.ShouldBindUri(uriPtr); err != nil {
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameUri); ok {
+		fieldValuePtr := reflect.New(fieldType.Type).Interface()
+		if err = c.ShouldBindUri(fieldValuePtr); err != nil {
 			err = code.ClientErrUri.WithError(err)
 			return
 		}
-		uri.Set(reflect.ValueOf(uriPtr).Elem())
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
 	}
-	if header := reqValue.FieldByName(ReqFieldNameHeader); header.IsValid() {
-		headerPtr := reflect.New(header.Type()).Interface()
-		if err = ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameHeader); ok {
+		fieldValuePtr := reflect.New(fieldType.Type).Interface()
+		if err = ShouldBindHeader(c.Request.Header, fieldValuePtr); err != nil {
 			err = code.ClientErrHeader.WithError(err)
 			return
 		}
-		header.Set(reflect.ValueOf(headerPtr).Elem())
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
 	}
-	if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
-		meta.Set(reflect.ValueOf(c.Keys))
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameMeta); ok {
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c.Keys))
 	}
-	if fc := reqValue.FieldByName(ReqFieldNameC); fc.IsValid() {
-		fc.Set(reflect.ValueOf(c))
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameC); ok {
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c))
 	}
 	return
 }
@@ -187,6 +187,12 @@ const (
 )
 
 const (
-	TagKey       = "bind"
-	TagReuseBody = "reuse_body"
+	TagKey         = "bind"
+	TagReuseBody   = "reuse_body"
+	TagIgnoreError = "ignore_error"
 )
+
+//TODO: 存到map，避免每个请求找一遍
+func tagHas(tag reflect.StructTag, value string) (ok bool) {
+	return strings.Contains(tag.Get(TagKey), value)
+}
