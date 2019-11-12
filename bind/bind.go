@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/sirupsen/logrus"
 	"reflect"
+	"strings"
 	"zlutils/caller"
 	"zlutils/code"
 )
@@ -127,52 +128,87 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 }
 
-//虽然应当由v7改成v8，但是没人用就算了
+var bindFuncs = []struct {
+	name     string
+	bindFunc func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error)
+}{
+	{
+		name: ReqFieldNameBody,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if _, ok := tagMap[TagReuseBody]; ok {
+				err = c.ShouldBindBodyWith(obj, binding.JSON)
+			} else {
+				err = c.ShouldBindJSON(obj)
+			}
+			if err != nil {
+				err = code.ClientErrBody.WithError(err)
+				return
+			}
+			return
+		},
+	},
+
+	{
+		name: ReqFieldNameQuery,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = c.ShouldBindQuery(obj); err != nil {
+				err = code.ClientErrQuery.WithError(err)
+				return
+			}
+			return
+		},
+	},
+	{
+		name: ReqFieldNameUri,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = c.ShouldBindUri(obj); err != nil {
+				err = code.ClientErrUri.WithError(err)
+				return
+			}
+			return
+		},
+	},
+	{
+		name: ReqFieldNameHeader,
+		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
+			if err = ShouldBindHeader(c.Request.Header, obj); err != nil {
+				err = code.ClientErrHeader.WithError(err)
+				return
+			}
+			return
+		},
+	},
+}
+
 func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
 	reqValue = reflect.New(reqType).Elem()
 
-	if body := reqValue.FieldByName(ReqFieldNameBody); body.IsValid() {
-		bodyPtr := reflect.New(body.Type()).Interface()
-		if bodyType, _ := reqType.FieldByName(ReqFieldNameBody); bodyType.Tag.Get(TagKey) == TagReuseBody {
-			err = c.ShouldBindBodyWith(bodyPtr, binding.JSON)
-		} else {
-			err = c.ShouldBindJSON(bodyPtr)
+	for _, bf := range bindFuncs {
+		if fieldType, ok := reqType.FieldByName(bf.name); ok {
+			fieldValuePtr := reflect.New(fieldType.Type).Interface()
+
+			tagMap := map[string]struct{}{}
+			for _, tag := range strings.Split(fieldType.Tag.Get(TagKey), ",") {
+				tagMap[tag] = struct{}{}
+			}
+
+			if err = bf.bindFunc(c, fieldValuePtr, tagMap); err != nil {
+				if _, ok := tagMap[TagIgnoreError]; ok {
+					err = nil //如果发生了错误，但是有ignore_error标签，那么就继续，也没有warn日志
+				} else {
+					return
+				}
+			} else {
+				reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(fieldValuePtr).Elem())
+			}
 		}
-		if err != nil {
-			err = code.ClientErrBody.WithError(err)
-			return
-		}
-		body.Set(reflect.ValueOf(bodyPtr).Elem())
 	}
-	if query := reqValue.FieldByName(ReqFieldNameQuery); query.IsValid() {
-		queryPtr := reflect.New(query.Type()).Interface()
-		if err = c.ShouldBindQuery(queryPtr); err != nil {
-			err = code.ClientErrQuery.WithError(err)
-			return
-		}
-		query.Set(reflect.ValueOf(queryPtr).Elem())
+
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameMeta); ok {
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c.Keys))
 	}
-	if uri := reqValue.FieldByName(ReqFieldNameUri); uri.IsValid() {
-		uriPtr := reflect.New(uri.Type()).Interface()
-		if err = c.ShouldBindUri(uriPtr); err != nil {
-			err = code.ClientErrUri.WithError(err)
-			return
-		}
-		uri.Set(reflect.ValueOf(uriPtr).Elem())
-	}
-	if header := reqValue.FieldByName(ReqFieldNameHeader); header.IsValid() {
-		headerPtr := reflect.New(header.Type()).Interface()
-		if err = ShouldBindHeader(c.Request.Header, headerPtr); err != nil {
-			err = code.ClientErrHeader.WithError(err)
-			return
-		}
-		header.Set(reflect.ValueOf(headerPtr).Elem())
-	}
-	if meta := reqValue.FieldByName(ReqFieldNameMeta); meta.IsValid() {
-		meta.Set(reflect.ValueOf(c.Keys))
-	}
-	if fc := reqValue.FieldByName(ReqFieldNameC); fc.IsValid() {
-		fc.Set(reflect.ValueOf(c))
+	if fieldType, ok := reqType.FieldByName(ReqFieldNameC); ok {
+		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c))
 	}
 	return
 }
@@ -187,6 +223,7 @@ const (
 )
 
 const (
-	TagKey       = "bind"
-	TagReuseBody = "reuse_body"
+	TagKey         = "bind"
+	TagReuseBody   = "reuse_body"
+	TagIgnoreError = "ignore_error"
 )
