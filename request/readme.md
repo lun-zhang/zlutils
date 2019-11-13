@@ -92,6 +92,20 @@ for _, id := range ids {
 一次性设置的用况比较大，所以直接当做map来设置就非常方便  
 AddQuery接收的value是interface，由to.String转成字符串  
 对于Header参数来说，只能是个map，value也由to.String将value转成string
+### query参数支持直接传递数组/切片
+上面的样例可以这样写
+```go
+req := request.Request{
+	Config: request.Config{
+		Method: http.MethodGet,
+		Url:    "http://localhost:11152/book?caller=test",
+	},
+	Query: request.MSI{
+		"type": "history", //一次性设置
+		"id"  : []int{1, 2},//可以直接输入数组
+	},
+}
+```
 ### 不用这个包，自己拼接query参数就不是那么方便了
 上述query参数拼接完之后应当是
 ```
