@@ -35,12 +35,12 @@ func checkReqType(t reflect.Type, has map[string]struct{}) {
 			}
 			has[ti.Name] = struct{}{}
 			switch ti.Name {
-			case ReqFieldNameBody:
-			case ReqFieldNameQuery:
-			case ReqFieldNameUri:
-			case ReqFieldNameHeader:
-			case ReqFieldNameMeta:
-			case ReqFieldNameC:
+			case reqFieldNameBody:
+			case reqFieldNameQuery:
+			case reqFieldNameUri:
+			case reqFieldNameHeader:
+			case reqFieldNameMeta:
+			case reqFieldNameC:
 			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
 				logrus.Fatalf("invalid req field name:%s", ti.Name)
 			}
@@ -133,9 +133,9 @@ var bindFuncs = []struct {
 	bindFunc func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error)
 }{
 	{
-		name: ReqFieldNameBody,
+		name: reqFieldNameBody,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
-			if _, ok := tagMap[TagReuseBody]; ok {
+			if _, ok := tagMap[tagReuseBody]; ok {
 				err = c.ShouldBindBodyWith(obj, binding.JSON)
 			} else {
 				err = c.ShouldBindJSON(obj)
@@ -149,7 +149,7 @@ var bindFuncs = []struct {
 	},
 
 	{
-		name: ReqFieldNameQuery,
+		name: reqFieldNameQuery,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
 			if err = c.ShouldBindQuery(obj); err != nil {
 				err = code.ClientErrQuery.WithError(err)
@@ -159,7 +159,7 @@ var bindFuncs = []struct {
 		},
 	},
 	{
-		name: ReqFieldNameUri,
+		name: reqFieldNameUri,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
 			if err = c.ShouldBindUri(obj); err != nil {
 				err = code.ClientErrUri.WithError(err)
@@ -169,7 +169,7 @@ var bindFuncs = []struct {
 		},
 	},
 	{
-		name: ReqFieldNameHeader,
+		name: reqFieldNameHeader,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
 			if err = ShouldBindHeader(c.Request.Header, obj); err != nil {
 				err = code.ClientErrHeader.WithError(err)
@@ -188,12 +188,12 @@ func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value
 			fieldValuePtr := reflect.New(fieldType.Type).Interface()
 
 			tagMap := map[string]struct{}{}
-			for _, tag := range strings.Split(fieldType.Tag.Get(TagKey), ",") {
+			for _, tag := range strings.Split(fieldType.Tag.Get(tagKey), ",") {
 				tagMap[tag] = struct{}{}
 			}
 
 			if err = bf.bindFunc(c, fieldValuePtr, tagMap); err != nil {
-				if _, ok := tagMap[TagIgnoreError]; ok {
+				if _, ok := tagMap[tagIgnoreError]; ok {
 					err = nil //如果发生了错误，但是有ignore_error标签，那么就继续，也没有warn日志
 				} else {
 					return
@@ -204,26 +204,26 @@ func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value
 		}
 	}
 
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameMeta); ok {
+	if fieldType, ok := reqType.FieldByName(reqFieldNameMeta); ok {
 		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c.Keys))
 	}
-	if fieldType, ok := reqType.FieldByName(ReqFieldNameC); ok {
+	if fieldType, ok := reqType.FieldByName(reqFieldNameC); ok {
 		reqValue.FieldByIndex(fieldType.Index).Set(reflect.ValueOf(c))
 	}
 	return
 }
 
 const (
-	ReqFieldNameBody   = "Body"
-	ReqFieldNameQuery  = "Query"
-	ReqFieldNameUri    = "Uri"
-	ReqFieldNameHeader = "Header"
-	ReqFieldNameMeta   = "Meta"
-	ReqFieldNameC      = "C"
+	reqFieldNameBody   = "Body"
+	reqFieldNameQuery  = "Query"
+	reqFieldNameUri    = "Uri"
+	reqFieldNameHeader = "Header"
+	reqFieldNameMeta   = "Meta"
+	reqFieldNameC      = "C"
 )
 
 const (
-	TagKey         = "bind"
-	TagReuseBody   = "reuse_body"
-	TagIgnoreError = "ignore_error"
+	tagKey         = "bind"
+	tagReuseBody   = "reuse_body"
+	tagIgnoreError = "ignore_error"
 )
