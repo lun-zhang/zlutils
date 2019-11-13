@@ -52,13 +52,6 @@ type Code struct {
 	msgMap MSS    //多语言的msg
 	err    error  //真实的err，用于debug返回
 	split  string //分割符
-	isPass bool   //是否是rpc透传码
-}
-
-//是rpc透传码
-func (code Code) WithPass() Code {
-	code.isPass = true
-	return code
 }
 
 //复制一份，否则线程竞争
@@ -172,8 +165,7 @@ type result struct {
 }
 
 const (
-	keyRet    = "_key_ret"
-	keyIsPass = "_key_is_pass"
+	keyRet = "_key_ret"
 )
 
 func isServerErr(ret int) bool {
@@ -241,7 +233,7 @@ func RespIsServerErr(c *gin.Context) bool {
 		return true
 	}
 	if ret, ok := getRet(c); ok {
-		return isServerErr(ret)
+		return isOthersRet(ret) || isServerErr(ret) //rpc错误也算服务器错误
 	}
 	return false
 }
@@ -251,14 +243,14 @@ func RespIsClientErr(c *gin.Context) bool {
 		return true
 	}
 	if ret, ok := getRet(c); ok {
-		return isClientErr(ret)
+		return !isOthersRet(ret) && isClientErr(ret)
 	}
 	return false
 }
 
-func respIsPassErr(c *gin.Context) bool {
-	_, ok := c.Get(keyIsPass)
-	return ok
+//是其他服务的错误码
+func isOthersRet(ret int) bool {
+	return misc.AbsInt(ret) >= codePrefix+localCodeLast
 }
 
 func Send(c *gin.Context, data interface{}, err error) {
@@ -296,9 +288,6 @@ func Send(c *gin.Context, data interface{}, err error) {
 	if code.Ret != 0 || //不是成功就不反回data
 		misc.IsNil(data) { //如果data设为nil则也不返回
 		data = nil
-	}
-	if code.isPass {
-		c.Set(keyIsPass, struct{}{})
 	}
 	c.Set(keyRet, code.Ret) //保存ret用于metrics
 	c.JSON(http.StatusOK, result{

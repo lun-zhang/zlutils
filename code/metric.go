@@ -60,16 +60,12 @@ func MidRespCounterErr(projectName string) gin.HandlerFunc {
 	)
 	return func(c *gin.Context) {
 		c.Next()
-		//如果是透传码错误则不可再统计客户端/服务端错误，因为透传码是来自别的服务
-		if respIsPassErr(c) {
-			getCounter(c, passErrorCounter).Inc()
-		} else {
-			if RespIsClientErr(c) {
-				getCounter(c, clientErrorCounter).Inc()
-			}
-			if RespIsServerErr(c) {
-				getCounter(c, serverErrorCounter).Inc()
-			}
+
+		if RespIsClientErr(c) {
+			getCounter(c, clientErrorCounter).Inc()
+		}
+		if RespIsServerErr(c) {
+			getCounter(c, serverErrorCounter).Inc()
 		}
 	}
 }
