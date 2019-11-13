@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 	"zlutils/guard"
@@ -113,11 +114,31 @@ func (m Request) GetUrl(ctx context.Context) (string, error) {
 		query[k] = append(query[k], vs...)
 	}
 	for k, v := range m.Query {
-		query.Add(k, to.String(v))
+		if items, ok := tryGetItemsIfSlice(v); ok { //只解一层，不递归
+			for _, item := range items {
+				query.Add(k, to.String(item))
+			}
+		} else {
+			query.Add(k, to.String(v))
+		}
+
 	}
 
 	rawUrl.RawQuery = query.Encode()
 	return rawUrl.String(), nil
+}
+
+//如果是数组/切片则获取元素
+func tryGetItemsIfSlice(slice interface{}) (items []interface{}, ok bool) {
+	v := reflect.ValueOf(slice)
+	if v.Kind() != reflect.Slice &&
+		v.Kind() != reflect.Array {
+		return nil, false
+	}
+	for i := 0; i < v.Len(); i++ {
+		items = append(items, v.Index(i).Interface())
+	}
+	return items, true
 }
 
 func (m Request) GetRequest(ctx context.Context) (request *http.Request, err error) {
