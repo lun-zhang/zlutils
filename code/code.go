@@ -20,16 +20,19 @@ import (
 //}
 
 //默认前缀，不可被任何人显示使用，用于当忘记设置时排查
-const defaultCodePrefix = 1000000 //1e6
+const defaultCodePrefix int32 = 1
 
 //错误码前缀，wiki维护，目前是个默认值
-var codePrefix = defaultCodePrefix
+var codePrefix int32 = defaultCodePrefix
 
 //服务自己用的错误码上限，因此最大为99999
-const localCodeLast = 100000 //1e5
+const localCodeLast int32 = 100000 //1e5
 
-func SetCodePrefix(prefix int) {
-	if codePrefix < defaultCodePrefix {
+//前缀上限1e4，与local相乘不会溢出，int32大致范围是[-2e9,2e9]
+const defaultCodePrefixLast int32 = 10000 //1e4
+
+func SetCodePrefix(prefix int32) {
+	if codePrefix < defaultCodePrefix || codePrefix > defaultCodePrefixLast {
 		logrus.Panicf("code prefix:%d must bigger than %d", prefix, defaultCodePrefix)
 	}
 	codePrefix = prefix
@@ -44,7 +47,7 @@ rpc拓传错误码和错误信息
 */
 
 type Code struct {
-	Ret     int    `json:"ret"`
+	Ret     int32  `json:"ret"`
 	Msg     string `json:"msg"`
 	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
 	//Help    string `json:"help,omitempty"`     //点击此链接调转到错误详情,限制内网
@@ -104,7 +107,7 @@ func (code Code) Error() string {
 	return fmt.Sprintf("ret: %d, msg: %s", code.Ret, msg)
 }
 
-var retMap = map[int]struct{}{}
+var retMap = map[int32]struct{}{}
 
 //并没有自己的方法，所以就当个简写
 type MSS = map[string]string
@@ -112,7 +115,7 @@ type MSS = map[string]string
 //如果msg是string，则当做英语
 //如果msg是map，那么会复制一份，所以可以放心不会被修改
 //如果msg是其他类型则panic
-func Add(retGlobal int, msg interface{}) (code Code) {
+func Add(retGlobal int32, msg interface{}) (code Code) {
 	var msgMap MSS
 	switch msg := msg.(type) {
 	case string:
@@ -132,19 +135,19 @@ func Add(retGlobal int, msg interface{}) (code Code) {
 
 //由于项目的日志/监控中可能充斥者各个服务的ret，因此必须在Add时候，就把前缀填充
 //填充局部码，只能在
-func AddLocal(retLocal int, msg interface{}) (code Code) {
+func AddLocal(retLocal int32, msg interface{}) (code Code) {
 	switch {
 	case retLocal > 0 && retLocal < localCodeLast:
-		retLocal += codePrefix
+		retLocal += codePrefix * localCodeLast
 	case retLocal < 0 && retLocal > -localCodeLast:
-		retLocal -= codePrefix
+		retLocal -= codePrefix * localCodeLast
 	default:
 		logrus.Panicf("invalid retLocal:%d", retLocal)
 	}
 	return Add(retLocal, msg)
 }
 
-func add(ret int, msgMap MSS) (code Code) {
+func add(ret int32, msgMap MSS) (code Code) {
 	if _, ok := retMap[ret]; ok {
 		panic(fmt.Errorf("ret %d exist", ret)) //NOTE: 禁止传相同的ret
 	}
@@ -168,7 +171,7 @@ const (
 	keyRet = "_key_ret"
 )
 
-func isServerErr(ret int) bool {
+func isServerErr(ret int32) bool {
 	//我的旧的
 	if ret >= 5000 && ret < 6000 {
 		return true
@@ -180,7 +183,7 @@ func isServerErr(ret int) bool {
 
 	return false
 }
-func isClientErr(ret int) bool {
+func isClientErr(ret int32) bool {
 	//我的旧的
 	if ret >= 4000 && ret < 5000 {
 		return true
@@ -219,9 +222,9 @@ func midMidRespWith(closeInRelease bool, key string) gin.HandlerFunc {
 	}
 }
 
-func getRet(c *gin.Context) (int, bool) {
+func getRet(c *gin.Context) (int32, bool) {
 	if v, ok := c.Get(keyRet); ok {
-		if ret, ok := v.(int); ok {
+		if ret, ok := v.(int32); ok {
 			return ret, ok
 		}
 	}
@@ -249,8 +252,8 @@ func RespIsClientErr(c *gin.Context) bool {
 }
 
 //是其他服务的错误码
-func isOthersRet(ret int) bool {
-	return misc.AbsInt(ret) >= codePrefix+localCodeLast
+func isOthersRet(ret int32) bool {
+	return misc.AbsInt32(ret) >= codePrefix+localCodeLast
 }
 
 func Send(c *gin.Context, data interface{}, err error) {

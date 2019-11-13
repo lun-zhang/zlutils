@@ -175,10 +175,12 @@ func TestVali(t *testing.T) {
 	}))
 }
 func TestPass(t *testing.T) {
+	code.SetCodePrefix(3)
+	clientErr1 := code.AddLocal(-1, "this client error")
 	router := gin.New()
 	router.Use(code.MidRespCounterErr("rpc"))
-	router.GET("rpc/metrics", metric.Metrics)
-	router.GET("rpc/code", code.MidRespWithErr(false),
+	router.GET("request/metrics", metric.Metrics)
+	router.GET("request/pass", code.MidRespWithErr(false),
 		func(c *gin.Context) {
 			req := Request{
 				Config: Config{
@@ -192,6 +194,9 @@ func TestPass(t *testing.T) {
 			err := req.Do(ctx, &resp)
 			code.Send(c, 1, err)
 		})
+	router.GET("request/client_err", func(c *gin.Context) {
+		code.Send(c, 2, clientErr1)
+	})
 	router.Run(":12346")
 }
 

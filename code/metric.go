@@ -5,7 +5,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
-	"strconv"
 )
 
 func getCounter(c *gin.Context, cv *prometheus.CounterVec) prometheus.Counter {
@@ -28,7 +27,7 @@ func getRetLabel(c *gin.Context) string {
 			return "no_ret"
 		}
 	}
-	return strconv.Itoa(ret)
+	return fmt.Sprintf("%d", ret)
 }
 
 func MidRespCounterErr(projectName string) gin.HandlerFunc {
