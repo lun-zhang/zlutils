@@ -194,3 +194,47 @@ func TestPass(t *testing.T) {
 		})
 	router.Run(":12346")
 }
+
+func TestTryGetItemsIfSlice(t *testing.T) {
+	a := []int{1, 2, 3}
+	var b [3]int
+	b[0] = 10
+	for i, test := range []struct {
+		in interface{}
+		ok bool
+	}{
+		{a, true},
+		{b, true},
+		{3, false},
+	} {
+		s, ok := tryGetItemsIfSlice(test.in)
+		if ok != test.ok {
+			t.Errorf("%d faild, get %v want %v,in:%v", i, ok, test.ok, test.in)
+		} else {
+			t.Logf("%d pass, in:%v, s:%v", i, test.in, s)
+		}
+	}
+}
+
+func TestQuerySlice(t *testing.T) {
+	a := []int{1, 2, 3}
+	var b [3]int
+	b[0] = 10
+	req := Request{
+		Config: Config{
+			Url: "http:/a.com",
+		},
+		Query: MSI{
+			"a": a,
+			"b": b,
+			"c": []string{"A", "B"},
+			"d": 1.2,
+		},
+	}
+	s, err := req.GetUrl(ctx)
+	if err != nil {
+		t.Error(err)
+	} else {
+		fmt.Println(s)
+	}
+}
