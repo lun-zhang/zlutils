@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"zlutils/code"
 	"zlutils/guard"
 	zt "zlutils/time"
 )
@@ -217,9 +218,16 @@ func (m Request) Do(ctx context.Context, respBody RespBodyI) (err error) {
 	if seg := xray.GetSegment(ctx); seg != nil { //允许不传xray的ctx
 		client = xray.Client(client)
 	}
+	//以下发生的错误都是rpc错误
+	defer func() {
+		if err != nil {
+			if _, ok := err.(code.Code); !ok {
+				err = code.ServerErrRpc.WithError(err)
+			} //else已经被设置了错误码（在Check接口中），则不再设置
+		}
+	}()
 	resp, err := ctxhttp.Do(ctx, client, request)
 	if err != nil { //超时
-		//err = code.ServerErrRpc.WithError(err)
 		entry.WithError(err).Error()
 		return
 	}

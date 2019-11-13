@@ -138,7 +138,7 @@ func TestReqGet(t *testing.T) {
 	}
 
 	var respBody struct {
-		RespRet
+		RetMsg
 		Data interface{} `json:"data"`
 	}
 
