@@ -145,9 +145,6 @@ func getRet(c *gin.Context) (int32, bool) {
 }
 
 func RespIsServerErr(c *gin.Context) bool {
-	if statusCode := c.Writer.Status(); statusCode >= 500 && statusCode < 600 {
-		return true
-	}
 	if ret, ok := getRet(c); ok {
 		return isServerErr(ret)
 	}
@@ -155,9 +152,6 @@ func RespIsServerErr(c *gin.Context) bool {
 }
 
 func RespIsClientErr(c *gin.Context) bool {
-	if statusCode := c.Writer.Status(); statusCode >= 400 && statusCode < 500 {
-		return true
-	}
 	if ret, ok := getRet(c); ok {
 		return isClientErr(ret)
 	}

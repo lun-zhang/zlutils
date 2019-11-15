@@ -51,11 +51,13 @@ func MidRespCounterErr(projectName string) gin.HandlerFunc {
 	)
 	return func(c *gin.Context) {
 		c.Next()
-
-		if RespIsClientErr(c) {
+		statusCode := c.Writer.Status()
+		if statusCode >= 400 && statusCode < 500 ||
+			RespIsClientErr(c) {
 			getCounter(c, clientErrorCounter).Inc()
 		}
-		if RespIsServerErr(c) {
+		if statusCode >= 500 && statusCode < 600 ||
+			RespIsServerErr(c) {
 			getCounter(c, serverErrorCounter).Inc()
 		}
 	}
