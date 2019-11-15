@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-xray-sdk-go/xray"
-	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
-	"zlutils/code"
 	"zlutils/guard"
 	"zlutils/logger"
-	"zlutils/metric"
 	zt "zlutils/time"
 	zx "zlutils/xray"
 )
@@ -173,31 +170,6 @@ func TestVali(t *testing.T) {
 		Method: "GET",
 		Url:    "http://a.com?a=1&b=c=a",
 	}))
-}
-func TestPass(t *testing.T) {
-	code.SetCodePrefix(3)
-	clientErr1 := code.AddLocal(-1, "this client error")
-	router := gin.New()
-	router.Use(code.MidRespCounterErr("rpc"))
-	router.GET("request/metrics", metric.Metrics)
-	router.GET("request/pass", code.MidRespWithErr(false),
-		func(c *gin.Context) {
-			req := Request{
-				Config: Config{
-					Url:    "http://localhost:12345/code/multi",
-					Method: http.MethodGet,
-				},
-			}
-			var resp struct {
-				RespPass
-			}
-			err := req.Do(ctx, &resp)
-			code.Send(c, 1, err)
-		})
-	router.GET("request/client_err", func(c *gin.Context) {
-		code.Send(c, 2, clientErr1)
-	})
-	router.Run(":12346")
 }
 
 func TestTryGetItemsIfSlice(t *testing.T) {

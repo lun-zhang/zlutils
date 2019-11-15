@@ -124,12 +124,10 @@ func TestAddNoEn(t *testing.T) {
 
 func TestMultiLang(t *testing.T) {
 	logger.Init(logger.Config{Level: logrus.DebugLevel})
-	SetCodePrefix(2)
-	co := AddLocal(99999, MSS{
+	co := Add(1, MSS{
 		"en": "e",
 		"zh": "中",
 	})
-	SetDefaultSplit(". ")
 	r := gin.New()
 	r.GET("code/multi",
 		MidRespWithErr(false),

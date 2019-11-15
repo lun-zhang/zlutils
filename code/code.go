@@ -6,55 +6,16 @@ import (
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"reflect"
-	"strings"
 	"zlutils/misc"
 	"zlutils/xray"
 )
 
-//type Interface interface {
-//	Code()
-//	Message()
-//	Error() string
-//	WithError(err error) Interface
-//	WithErrorf(format string, a ...interface{}) Interface
-//}
-
-//默认前缀，不可被任何人显示使用，用于当忘记设置时排查
-const defaultCodePrefix int32 = 1
-
-//错误码前缀，wiki维护，目前是个默认值
-var codePrefix int32 = defaultCodePrefix
-
-//服务自己用的错误码上限，因此最大为99999
-const localCodeLast int32 = 100000 //1e5
-
-//前缀上限1e4，与local相乘不会溢出，int32大致范围是[-2e9,2e9]
-const defaultCodePrefixLast int32 = 10000 //1e4
-
-func SetCodePrefix(prefix int32) {
-	if codePrefix < defaultCodePrefix || codePrefix > defaultCodePrefixLast {
-		logrus.Panicf("code prefix:%d must bigger than %d", prefix, defaultCodePrefix)
-	}
-	codePrefix = prefix
-}
-
-/*
-rpc拓传错误码和错误信息
-目前，我的rpc接口会返回错误的敏感信息，其他人的接口未返回
-因此调我rpc接口的服务，不可把敏感信息传出
-由于未统一错误码，所以服务之间有相同的错误码，这些错误码不可透传
-公共错误码，服务之间不可相同，
-*/
-
 type Code struct {
 	Ret     int32  `json:"ret"`
 	Msg     string `json:"msg"`
+	msgMap  MSS    //多语言的msg
+	err     error  //真实的err，用于debug返回
 	TraceId string `json:"trace_id,omitempty"` //跟踪id,用于debug返回，虽然响应的header里有key=x-amzn-trace-id,value="Root=$trace_id"，但是太依赖aws
-	//Help    string `json:"help,omitempty"`     //点击此链接调转到错误详情,限制内网
-
-	msgMap MSS    //多语言的msg
-	err    error  //真实的err，用于debug返回
-	split  string //分割符
 }
 
 //复制一份，否则线程竞争
@@ -81,21 +42,6 @@ func (code Code) WithErrorf(format string, a ...interface{}) Code {
 	return code.WithError(fmt.Errorf(format, a...))
 }
 
-var defaultSplit = ": "
-
-func SetDefaultSplit(split string) {
-	if split == "" {
-		logrus.Panicf("split cant empty")
-	}
-	defaultSplit = split
-}
-
-//NOTE: split不可是msg的子串，否则会在Send函数中被替换成DefaultSplit
-func (code Code) WithSplit(split string) Code {
-	code.split = split
-	return code
-}
-
 func (code Code) Error() string {
 	if code.err != nil {
 		return code.err.Error()
@@ -115,7 +61,7 @@ type MSS = map[string]string
 //如果msg是string，则当做英语
 //如果msg是map，那么会复制一份，所以可以放心不会被修改
 //如果msg是其他类型则panic
-func Add(retGlobal int32, msg interface{}) (code Code) {
+func Add(ret int32, msg interface{}) (code Code) {
 	var msgMap MSS
 	switch msg := msg.(type) {
 	case string:
@@ -130,21 +76,7 @@ func Add(retGlobal int32, msg interface{}) (code Code) {
 	default:
 		logrus.Panicf("invalid msg type:%s", reflect.TypeOf(msg))
 	}
-	return add(retGlobal, msgMap)
-}
-
-//由于项目的日志/监控中可能充斥者各个服务的ret，因此必须在Add时候，就把前缀填充
-//填充局部码，只能在
-func AddLocal(retLocal int32, msg interface{}) (code Code) {
-	switch {
-	case retLocal > 0 && retLocal < localCodeLast:
-		retLocal += codePrefix * localCodeLast
-	case retLocal < 0 && retLocal > -localCodeLast:
-		retLocal -= codePrefix * localCodeLast
-	default:
-		logrus.Panicf("invalid retLocal:%d", retLocal)
-	}
-	return Add(retLocal, msg)
+	return add(ret, msgMap)
 }
 
 func add(ret int32, msgMap MSS) (code Code) {
@@ -167,32 +99,13 @@ type result struct {
 	Data interface{} `json:"data,omitempty"`
 }
 
-const (
-	keyRet = "_key_ret"
-)
+const keyRet = "_key_ret"
 
 func isServerErr(ret int32) bool {
-	//我的旧的
-	if ret >= 5000 && ret < 6000 {
-		return true
-	}
-	//统一新的
-	if ret > 0 {
-		return true
-	}
-
-	return false
+	return ret >= 5000 && ret < 6000
 }
 func isClientErr(ret int32) bool {
-	//我的旧的
-	if ret >= 4000 && ret < 5000 {
-		return true
-	}
-	//统一新的
-	if ret < 0 {
-		return true
-	}
-	return false
+	return ret >= 4000 && ret < 5000
 }
 
 const (
@@ -236,7 +149,7 @@ func RespIsServerErr(c *gin.Context) bool {
 		return true
 	}
 	if ret, ok := getRet(c); ok {
-		return isOthersRet(ret) || isServerErr(ret) //rpc错误也算服务器错误
+		return isServerErr(ret)
 	}
 	return false
 }
@@ -246,14 +159,9 @@ func RespIsClientErr(c *gin.Context) bool {
 		return true
 	}
 	if ret, ok := getRet(c); ok {
-		return !isOthersRet(ret) && isClientErr(ret)
+		return isClientErr(ret)
 	}
 	return false
-}
-
-//是其他服务的错误码
-func isOthersRet(ret int32) bool {
-	return misc.AbsInt32(ret) >= codePrefix+localCodeLast
 }
 
 func Send(c *gin.Context, data interface{}, err error) {
@@ -275,13 +183,11 @@ func Send(c *gin.Context, data interface{}, err error) {
 
 	if code.err != nil {
 		if _, ok := c.Get(keyRespWithErr); ok {
-			//code.Msg如果不是英语，而是用于toast的印地语时，不当输出错误信息
-			//用于toast时，就极有可能包含了分隔符
-			//当然如果你的接口是用于toast，那么肯定不能把rpc的结果直接返给app
-			if code.split == "" || strings.Contains(code.Msg, code.split) {
-				code.split = defaultSplit //可以改成". "
+			if code.Msg == "" {
+				code.Msg = code.err.Error()
+			} else {
+				code.Msg = fmt.Sprintf("%s: %s", code.Msg, code.err.Error())
 			}
-			code.Msg = code.Msg + code.split + code.err.Error()
 		}
 	}
 	if _, ok := c.Get(keyRespWithTraceId); ok {

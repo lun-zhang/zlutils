@@ -45,17 +45,9 @@ func MidRespCounterErr(projectName string) gin.HandlerFunc {
 		},
 		defaultLabelNames,
 	)
-	passErrorCounter := prometheus.NewCounterVec( //rpc透传码错误
-		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_pass_error_total", projectName),
-			Help: "Total Pass Error counts",
-		},
-		defaultLabelNames,
-	)
 	prometheus.MustRegister(
 		serverErrorCounter,
 		clientErrorCounter,
-		passErrorCounter,
 	)
 	return func(c *gin.Context) {
 		c.Next()
