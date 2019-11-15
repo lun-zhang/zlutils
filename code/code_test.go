@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"github.com/fvbock/endless"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"os"
 	"testing"
+	"zlutils/logger"
+	"zlutils/misc"
 	"zlutils/xray"
 )
 
@@ -14,15 +17,15 @@ func TestT(t *testing.T) {
 	router := gin.New()
 	//router.Use(zlutils.Recovery(),gin.Recovery())
 
-	router.GET("code/ok", Wrap(func(c *Context) {
-		c.Send("is ok", nil)
-	}))
-	router.GET("code/err", Wrap(func(c *Context) {
-		c.Send("is err", fmt.Errorf("err info"))
-	}))
-	router.GET("code/err/404", Wrap(func(c *Context) {
-		c.Send("is err", ClientErr404.WithErrorf("err info"))
-	}))
+	router.GET("code/ok", func(c *gin.Context) {
+		Send(c, "is ok", nil)
+	})
+	router.GET("code/err", func(c *gin.Context) {
+		Send(c, "is err", fmt.Errorf("err info"))
+	})
+	router.GET("code/err/404", func(c *gin.Context) {
+		Send(c, "is err", ClientErr404.WithErrorf("err info"))
+	})
 	gin.Mode()
 
 	endless.ListenAndServe(":11111", router)
@@ -34,11 +37,11 @@ func TestRespIsErr(t *testing.T) {
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 
-	c.Set(KeyRet, ClientErr.Ret)
+	c.Set(keyRet, ClientErr.Ret)
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 
-	c.Set(KeyRet, ServerErr.Ret)
+	c.Set(keyRet, ServerErr.Ret)
 	fmt.Println(RespIsClientErr(c))
 	fmt.Println(RespIsServerErr(c))
 }
@@ -71,17 +74,6 @@ func do(i int) (resp struct {
 	return
 }
 
-func TestWrapSend(t *testing.T) {
-	router := gin.New()
-	router.Group("", MidRespWithErr(false)).GET("we", WrapSend(ew))
-	router.GET("nil", func(c *gin.Context) {
-		var s *string
-		fmt.Println(s == nil)
-		Send(c, s, nil)
-	})
-	router.Run(":11124")
-}
-
 func TestMidRespWithErr(t *testing.T) {
 	//gin.SetMode(gin.ReleaseMode) //这一行注释掉后，app会带上err信息
 	router := gin.New()
@@ -108,7 +100,7 @@ func pj(i interface{}) {
 }
 
 func TestAdd(t *testing.T) {
-	c1 := Add(1, MLS{
+	c1 := Add(1, MSS{
 		"en": "e",
 		"zh": "中",
 	})
@@ -125,33 +117,38 @@ func TestAddNoEn(t *testing.T) {
 			t.Error("must panic")
 		}
 	}()
-	Add(1, MLS{ //panic
+	Add(1, MSS{ //panic
 		"zh": "中",
 	})
 }
 
 func TestMultiLang(t *testing.T) {
-	co := Add(1, MLS{
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
+	SetCodePrefix(2)
+	co := AddLocal(99999, MSS{
 		"en": "e",
 		"zh": "中",
 	})
+	SetDefaultSplit(". ")
 	r := gin.New()
-	r.Group("", MidRespWithErr(false)).
-		GET("code/multi", func(c *gin.Context) {
+	r.GET("code/multi",
+		MidRespWithErr(false),
+		logger.MidDebug(),
+		func(c *gin.Context) {
 			Send(c, nil, co.WithErrorf("with"))
 		})
 	r.Run(":12345")
 }
 
 func TestAddIsClone(t *testing.T) {
-	msg := MLS{
-		LangEn: "e",
+	msg := MSS{
+		misc.LangEnglish: "e",
 	}
 	co := Add(1, msg)
 	fmt.Println(co.msgMap)
-	msg[LangEn] = "e2"
+	msg[misc.LangEnglish] = "e2"
 	fmt.Println(co.msgMap)
-	if co.msgMap[LangEn] != "e" {
+	if co.msgMap[misc.LangEnglish] != "e" {
 		t.Error("不能被改变")
 	}
 }

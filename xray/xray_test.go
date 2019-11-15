@@ -17,18 +17,18 @@ func TestMid(t *testing.T) {
 	router := gin.New()
 	router.Use(Mid("zlutils", nil,
 		code.RespIsServerErr, code.RespIsClientErr))
-	router.GET("ok", code.Wrap(func(c *code.Context) {
-		c.Send("ok", nil)
-	}))
-	router.GET("err/server", code.Wrap(func(c *code.Context) {
-		c.Send("server err", code.ServerErr)
-	}))
-	router.GET("err/client", code.Wrap(func(c *code.Context) {
-		c.Send("client err", code.ClientErr)
-	}))
-	router.GET("err/seg", code.Wrap(func(c *code.Context) {
-		c.Send("seg err", f1(c.Request.Context()))
-	}))
+	router.GET("ok", func(c *gin.Context) {
+		code.Send(c, "ok", nil)
+	})
+	router.GET("err/server", func(c *gin.Context) {
+		code.Send(c, "server err", code.ServerErr)
+	})
+	router.GET("err/client", func(c *gin.Context) {
+		code.Send(c, "client err", code.ClientErr)
+	})
+	router.GET("err/seg", func(c *gin.Context) {
+		code.Send(c, "seg err", f1(c.Request.Context()))
+	})
 	router.GET("replace", func(c *gin.Context) {
 		s := &S{}
 		s.f(c.Request.Context())

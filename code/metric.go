@@ -5,10 +5,32 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
-	"strconv"
 )
 
-func InitDefaultMetric(projectName string) {
+func getCounter(c *gin.Context, cv *prometheus.CounterVec) prometheus.Counter {
+	return cv.WithLabelValues(GetEndpoint(c), getRetLabel(c))
+}
+
+var defaultLabelNames = []string{"endpoint", "ret"}
+
+//有些有path参数的接口，需要覆盖此函数
+var GetEndpoint = func(c *gin.Context) string {
+	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
+}
+
+func getRetLabel(c *gin.Context) string {
+	ret, ok := getRet(c)
+	if !ok {
+		if c.Writer.Status() == http.StatusNotFound {
+			ret = ClientErr404.Ret
+		} else {
+			return "no_ret"
+		}
+	}
+	return fmt.Sprintf("%d", ret)
+}
+
+func MidRespCounterErr(projectName string) gin.HandlerFunc {
 	serverErrorCounter := prometheus.NewCounterVec( //服务器错误，用于alert
 		prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_server_error_total", projectName),
@@ -23,39 +45,26 @@ func InitDefaultMetric(projectName string) {
 		},
 		defaultLabelNames,
 	)
+	passErrorCounter := prometheus.NewCounterVec( //rpc透传码错误
+		prometheus.CounterOpts{
+			Name: fmt.Sprintf("%s_pass_error_total", projectName),
+			Help: "Total Pass Error counts",
+		},
+		defaultLabelNames,
+	)
 	prometheus.MustRegister(
 		serverErrorCounter,
 		clientErrorCounter,
+		passErrorCounter,
 	)
+	return func(c *gin.Context) {
+		c.Next()
 
-	ServerErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return serverErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
-	}
-	ClientErrorCounter = func(c *gin.Context) prometheus.Counter {
-		return clientErrorCounter.WithLabelValues(GetEndpoint(c), getRet(c))
-	}
-}
-
-var defaultLabelNames = []string{"endpoint", "ret"}
-
-//有些有path参数的接口，需要覆盖此函数
-var GetEndpoint = func(c *gin.Context) string {
-	return fmt.Sprintf("%s-%s", c.Request.URL.Path, c.Request.Method)
-}
-
-func getRet(c *gin.Context) string {
-	ret, ok := GetRet(c)
-	if !ok {
-		if c.Writer.Status() == http.StatusNotFound {
-			ret = ClientErr404.Ret
-		} else {
-			return "no_ret"
+		if RespIsClientErr(c) {
+			getCounter(c, clientErrorCounter).Inc()
+		}
+		if RespIsServerErr(c) {
+			getCounter(c, serverErrorCounter).Inc()
 		}
 	}
-	return strconv.Itoa(ret)
 }
-
-var (
-	ServerErrorCounter func(*gin.Context) prometheus.Counter
-	ClientErrorCounter func(*gin.Context) prometheus.Counter
-)

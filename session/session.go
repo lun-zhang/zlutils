@@ -25,8 +25,8 @@ type OperatorWithTime struct {
 }
 
 const (
-	KeyOperator = "_key_operator"
-	KeyUser     = "_key_user"
+	keyOperator = "_key_operator"
+	keyUser     = "_key_user"
 )
 
 func MidOperator() gin.HandlerFunc {
@@ -49,7 +49,7 @@ func MidOperator() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set(KeyOperator, operator)
+		c.Set(keyOperator, operator)
 	}
 }
 
@@ -92,11 +92,11 @@ func (m Meta) Meta() meta.Meta {
 	return meta.Meta(m)
 }
 func (m Meta) GetOperator() Operator {
-	return meta.Meta(m).MustGet(KeyOperator).(Operator)
+	return meta.Meta(m).MustGet(keyOperator).(Operator)
 }
 
 func (m Meta) GetUser() User {
-	return meta.Meta(m).MustGet(KeyUser).(User)
+	return meta.Meta(m).MustGet(keyUser).(User)
 }
 
 const (
@@ -133,7 +133,7 @@ func MidUser() gin.HandlerFunc {
 			c.Abort()
 		} else {
 			user.refreshUserIdentity()
-			c.Set(KeyUser, user)
+			c.Set(keyUser, user)
 		}
 	}
 }
@@ -172,6 +172,6 @@ func MidBindUserVideoBuddy(bind request.Config) gin.HandlerFunc {
 		user.UserId = resp.Data.UserId
 		user.DeviceId = resp.Data.DeviceId
 		user.refreshUserIdentity()
-		c.Set(KeyUser, user)
+		c.Set(keyUser, user)
 	}
 }

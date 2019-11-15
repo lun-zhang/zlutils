@@ -177,16 +177,48 @@ type RespBodyI interface {
 }
 
 //最常用的错误结构
-type RespRet struct {
-	Ret int    `json:"ret"`
-	Msg string `json:"msg"`
-}
+type RespRet code.Code
 
 func (m RespRet) Check() error {
 	if m.Ret != 0 {
 		return fmt.Errorf("ret: %d != 0, msg: %s", m.Ret, m.Msg)
 	}
 	return nil
+}
+
+/*
+错误码透传
+如果客户端会将你服务A的msg作为toast弹出，而你又rpc调用了服务B，
+那么你不应该把B的Code透传给客户端，而当返回server error
+*/
+type RespPass code.Code
+
+//已知
+//我的rpc接口，返回的msg为 "simple_error: detail_error"
+//罗浩的rpc接口，返回msg为 "simple_error. detail_error"
+var splits = []string{": ", ". "} //simple_error中不可包含分隔符，目前看是没有的
+
+//不是指针，不修改code值
+func (m RespPass) Check() error {
+	if m.Ret == 0 {
+		return nil
+	}
+	msg := m.Msg
+	idx := -1
+	var sp string
+	for _, split := range splits {
+		if i := strings.Index(msg, split); i >= 0 {
+			idx = i
+			msg = msg[:i]
+			sp = split
+		}
+	}
+	if idx < 0 {
+		return code.Code(m)
+	}
+	e := m.Msg[idx+len(sp):]
+	m.Msg = msg //将错误详情从msg剔出
+	return code.Code(m).WithErrorf(e).WithSplit(sp)
 }
 
 //从logger里复制过来的

@@ -117,28 +117,6 @@ func valiVa(vaPtr *va, i interface{}) error {
 
 var vali = validator.New()
 
-// Deprecated: 用ValiStruct().GetJson()
-func GetJsonValiStruct(key string, ptr interface{}) {
-	GetJson(key, ptr)
-	if err := vali.Struct(ptr); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"key": key,
-			"ptr": ptr,
-		}).Panic()
-	}
-}
-
-// Deprecated: 用ValiVar(tag).GetJson()
-func GetJsonValiVar(key string, ptr interface{}, tag string) {
-	GetJson(key, ptr)
-	if err := vali.Var(ptr, tag); err != nil {
-		logrus.WithError(err).WithFields(logrus.Fields{
-			"key": key,
-			"ptr": ptr,
-		}).Panic()
-	}
-}
-
 func (m va) WatchJson(key string, ptr interface{}, handler func()) {
 	watchJson(key, ptr, handler, &m)
 }

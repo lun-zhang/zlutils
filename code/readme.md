@@ -120,8 +120,8 @@ if 活动已结束 {
 当ret!=0时，客户端将msg作为toast内容弹出，支持多语言：
 ```go
 var codeClientErrTaskLimitTotal = code.Add(4101, code.MLS{
-    code.LangEn: "Sorry, today's special are all sold-out. Pls come early tomorrow.",
-    code.LangHi: "क्षमा करें, आज का विशेष बोनस सभी बिक चुके हैं। कल जल्दी आना।",
+    misc.LangEnglish: "Sorry, today's special are all sold-out. Pls come early tomorrow.",
+    misc.LangHindi: "क्षमा करें, आज का विशेष बोनस सभी बिक चुके हैं। कल जल्दी आना।",
 })
 ```
 
