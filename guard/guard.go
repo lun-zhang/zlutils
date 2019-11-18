@@ -13,6 +13,7 @@ func Mid() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if rec := recover(); rec != nil {
+				//FIXME: 依赖了code包，作为更基础的包似乎应该解依赖
 				code.Send(c, nil, code.ServerErrPainc.WithErrorf("panic: %+v", rec))
 			}
 		}()
@@ -21,29 +22,19 @@ func Mid() gin.HandlerFunc {
 }
 
 type (
-	AfterFunc       func(errp *error)                     //会修改err,把panic变成err传出
-	BeforeFunc      func(args ...interface{}) AfterFunc   //这个虽然灵活，但是不便于在编译时发现错误
-	BeforeCtxFunc   func(ctxp *context.Context) AfterFunc //会修改ctx
+	AfterFunc func(errp *error) //会修改err,把panic变成err传出
+	//BeforeFunc      func(args ...interface{}) AfterFunc   //这个虽然灵活，但是不便于在编译时发现错误
+	//BeforeCtxFunc   func(ctxp *context.Context) AfterFunc //会修改ctx
 	DoBeforeCtxFunc func(ctxp *context.Context) (args []interface{})
 	DoAfterFunc     func(err error, args ...interface{})
 )
 
 var (
-	//NOTE: 允许用户函数开始前执行自定义方法，返回自定义的值
+	//允许用户函数开始前执行自定义方法，返回自定义的值
 	DoBeforeCtx DoBeforeCtxFunc = func(ctxp *context.Context) (args []interface{}) { return }
-	//NOTE: 允许用户在函数结束时候执行自定义方法，第一个参数是本身的err，或panic的err(要不要换成errp?)
+	//允许用户在函数结束时候执行自定义方法，第一个参数是本身的err，或panic的err(要不要换成errp?)
 	DoAfter DoAfterFunc = func(err error, args ...interface{}) {}
 )
-
-//NOTE: 如果不传，则用默认的（似乎不需要这个）
-//func InitDoCtxFunc(doBeforeCtx DoBeforeCtxFunc, doAfter DoAfterFunc) {
-//	if doBeforeCtx != nil {
-//		DoBeforeCtx = doBeforeCtx
-//	}
-//	if doAfter != nil {
-//		DoAfter = doAfter
-//	}
-//}
 
 func BeforeCtx(ctxp *context.Context) AfterFunc {
 	start := time.Now()
