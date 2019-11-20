@@ -1,17 +1,19 @@
 package misc
 
 import (
+	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"reflect"
 )
 
-func GetFieldNameFromSlice(slice interface{}, fieldName string, recvSlicePtr interface{}) (err error) {
-	entry := logrus.WithFields(logrus.Fields{
-		"slice":        slice,
-		"fieldName":    fieldName,
-		"recvSlicePtr": recvSlicePtr,
-	})
+func GetFieldNameFromSlice(ctx context.Context, slice interface{}, fieldName string, recvSlicePtr interface{}) (err error) {
+	entry := logrus.WithContext(ctx).
+		WithFields(logrus.Fields{
+			"slice":        slice,
+			"fieldName":    fieldName,
+			"recvSlicePtr": recvSlicePtr,
+		})
 	v := reflect.ValueOf(slice)
 	if v.Kind() != reflect.Slice {
 		err = fmt.Errorf("slice kind:%s isnt slice", v.Kind())
@@ -59,12 +61,13 @@ func GetFieldNameFromSlice(slice interface{}, fieldName string, recvSlicePtr int
 
 //将数组转成map，指定一个field当做key
 //如果有重复的key，则err
-func ConvStructSliceToMap(slice interface{}, keyFiledName string, recvMapPtr interface{}) (err error) {
-	entry := logrus.WithFields(logrus.Fields{
-		"slice":        slice,
-		"keyFiledName": keyFiledName,
-		"recvMapPtr":   recvMapPtr,
-	})
+func ConvStructSliceToMap(ctx context.Context, slice interface{}, keyFiledName string, recvMapPtr interface{}) (err error) {
+	entry := logrus.WithContext(ctx).
+		WithFields(logrus.Fields{
+			"slice":        slice,
+			"keyFiledName": keyFiledName,
+			"recvMapPtr":   recvMapPtr,
+		})
 	v := reflect.ValueOf(slice)
 	if v.Kind() != reflect.Slice {
 		err = fmt.Errorf("slice kind:%s isnt slice", v.Kind())
