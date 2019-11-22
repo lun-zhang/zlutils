@@ -191,11 +191,15 @@ func MidDebug() gin.HandlerFunc {
 			logrus.WithFields(logrus.Fields{
 				//TODO: 完善字段
 				FieldTraceId:   traceId,
+				FieldStack:     nil,
+				"host":         c.Request.Host,
 				"path":         c.Request.URL.Path,
+				"query":        c.Request.URL.Query(),
 				"method":       c.Request.Method,
 				"header":       c.Request.Header,
 				"request_body": tryGetJson(c.Request.Header, reqBody),
-				FieldStack:     nil,
+				"remote_addr":  c.Request.RemoteAddr,
+				"client_ip":    c.ClientIP(),
 			}).Debug()
 			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody)) //拿出来再放回去
 			c.Writer = debugWriter{
