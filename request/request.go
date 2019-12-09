@@ -78,8 +78,8 @@ type Request struct {
 }
 
 var (
-	defaultClient = &http.Client{
-		Transport: &http.Transport{
+	defaultClient = &http.Client{ //因为client缓存了tcp连接，所以要想不同的http请求能重复使用同一个连接，必须复用client对象，而不是每次创建
+		Transport: &http.Transport{ //实际上缓存连接的是Transport，所以主要是复用这个对象吧
 			//MaxIdleConns:        100,
 			//MaxIdleConnsPerHost: 2,
 			IdleConnTimeout: 5 * time.Minute,
