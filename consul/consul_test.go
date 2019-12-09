@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"testing"
+	"time"
 	"zlutils/logger"
 	"zlutils/request"
-	"zlutils/time"
+	zt "zlutils/time"
 )
 
 type Tmp struct {
-	D *time.Duration `json:"d" validate:"required"`
+	D *zt.Duration `json:"d" validate:"required"`
 }
 
 func TestWatchJson(t *testing.T) {
@@ -69,5 +70,19 @@ func TestGetJsonHandler(t *testing.T) {
 	Init(":8500", "test/service/counter")
 	GetJson("log_watch", func(log logger.Config) {
 		fmt.Println(log.Level)
+	})
+}
+
+func TestWithPrefix(t *testing.T) {
+	Init(":8500", "test/service/counter")
+	lo := WithPrefix("test/service/example")
+	lo.ValiVar("len=15").GetJson("eee", func(re string) {
+		fmt.Println(re)
+	})
+	ValiStruct().GetJson("redis", func(redis struct {
+		Url      string        `json:"url" validate:"url"`
+		Duration time.Duration `json:"duration"`
+	}) {
+		fmt.Println(redis)
 	})
 }
