@@ -54,5 +54,24 @@ consul.ValiStruct().WatchJsonVarious("log_watch",func(log logger.Config){
 ## 配置错误定位
 如果key找不到、value解析失败、参数校验失败等，都会有详细的错误日志
 
+## 配置复用
+目前每个项目都有自己的配置，好处是不会影响到其他项目，但坏处就是毫无复用可言，
+目前最频繁最需要复用的是rpc接口配置，例如`operations_rpc`，以及vcoin加金币等接口  
+那么用WithPrefix创建一个新的consul对象，指定新的前缀，
+例如我的公共配置放在`test/service/zl_com`目录，
+而我的项目目录在`test/service/example`，
+那么
+```go
+consul.Init(":8500","test/service/example")//初始化consul
+consul.GetJson("log",func(log logger.config){//这个读的key是 test/service/example/log
+	//初始化日志配置
+})
+consul.WithPrefix("test/service/zl_com").
+	GetJson("operations_rpc",func(operationsRpc request.Config){//这个读的key是 test/service/zl_com/operations_rpc
+		//注册
+})
+```
+要注意的是公共配置慎用watch
+
 ## 建议
 变量的声明尽量推迟到第一次用到它的地方、减少变量的暴露（这样做的缺点是不运行是不知道缺少哪些配置的）

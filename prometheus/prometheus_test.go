@@ -2,9 +2,11 @@ package prometheus
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"testing"
 	"time"
+	"zlutils/logger"
 	"zlutils/request"
 )
 
@@ -13,6 +15,7 @@ func TestGetAddress(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
 	GetAddress = func() (address string, err error) {
 		time.Sleep(time.Second)
 		return "127.0.0.1:9998", nil
@@ -20,7 +23,7 @@ func TestRegister(t *testing.T) {
 	go func() {
 		err := Register(request.Config{
 			Method: http.MethodPost,
-			Url:    "http://test-m.videobuddy.vid007.com/api/operations_rpc/consul/prometheus/job_modify?caller=counter",
+			Url:    "http://test-m.videobuddy.vid007.com/api/operations_rpc/consul/prometheus/job_modify",
 		}, "counter", "/counter/metrics")
 		if err != nil {
 			t.Fatal(err)

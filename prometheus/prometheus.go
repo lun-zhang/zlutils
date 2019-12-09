@@ -102,6 +102,9 @@ func Register(requestConfig request.Config, jobName, metricsPath string) (err er
 	var resp request.RespRet
 	req := request.Request{
 		Config: requestConfig,
+		Query: request.MSI{
+			"caller": jobName,
+		},
 		Body: request.MSI{
 			"job_name":     jobName,
 			"metrics_path": metricsPath,
@@ -116,6 +119,9 @@ func Register(requestConfig request.Config, jobName, metricsPath string) (err er
 	logrus.WithField("req", req).Info("register ok")
 	reqCh <- request.Request{
 		Config: requestConfig,
+		Query: request.MSI{
+			"caller": jobName,
+		},
 		Body: request.MSI{
 			"job_name":     jobName,
 			"metrics_path": metricsPath,

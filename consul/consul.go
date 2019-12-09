@@ -17,12 +17,30 @@ var (
 	Address string
 	Prefix  string
 	KV      *api.KV // KV is used to manipulate the K/V API
-	Catalog *api.Catalog
 )
 
+//自定义前缀，这样就可以复用配置了
+func WithPrefix(prefix string) Consul {
+	return Consul{prefixPtr: &prefix}
+}
+
+func (m Consul) WithPrefix(prefix string) Consul {
+	m.prefixPtr = &prefix
+	return m
+}
+
 func GetValue(key string) (value []byte) {
+	return getValue(key, defaultConsul)
+}
+func getValue(key string, lo Consul) (value []byte) {
 	entry := logrus.WithField("key", key)
-	pair, _, err := KV.Get(fmt.Sprintf("%s/%s", Prefix, key), nil)
+
+	prefix := Prefix
+	if lo.prefixPtr != nil {
+		prefix = *lo.prefixPtr
+	}
+
+	pair, _, err := KV.Get(fmt.Sprintf("%s/%s", prefix, key), nil)
 	if err != nil {
 		entry.WithError(err).Panic()
 	}
@@ -34,9 +52,13 @@ func GetValue(key string) (value []byte) {
 	return pair.Value
 }
 
+func (m Consul) GetValue(key string) (value []byte) {
+	return getValue(key, m)
+}
+
 var kv = map[string]reflect.Value{}
 
-func getJson(key string, i interface{}, vaPtr *va) {
+func getJson(key string, i interface{}, lo Consul) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -45,13 +67,13 @@ func getJson(key string, i interface{}, vaPtr *va) {
 
 	switch t.Kind() {
 	case reflect.Ptr:
-		value := GetValue(key)
+		value := getValue(key, lo)
 		entry = entry.WithField("bs", string(value))
 		if err := json.Unmarshal(value, i); err != nil {
 			entry.WithError(err).Panic("consul value invalid")
 		}
 		entry = entry.WithField("value", i)
-		if err := valiVa(vaPtr, i); err != nil {
+		if err := valiVa(lo, i); err != nil {
 			entry.WithError(err).Panicf("vali failed")
 		}
 		entry.Info("consul get value ok")
@@ -65,7 +87,7 @@ func getJson(key string, i interface{}, vaPtr *va) {
 
 		in0Type := t.In(0)
 		in0Ptr := reflect.New(in0Type).Interface()
-		getJson(key, in0Ptr, vaPtr)
+		getJson(key, in0Ptr, lo)
 		v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
 		return
 	default:
@@ -75,57 +97,76 @@ func getJson(key string, i interface{}, vaPtr *va) {
 
 //如果对值不关心，只想要用这个值去执行一个函数，例如用于初始化日志，那么第二个参数就传入有一个入参的函数吧
 func GetJson(key string, i interface{}) {
-	getJson(key, i, nil)
+	getJson(key, i, defaultConsul)
 }
 
-type va struct {
-	t   int
-	tag string
+//成员用指针，不为nil时候才使用对应功能
+type Consul struct {
+	valiTypePtr *int
+	tag         string
+	prefixPtr   *string
 }
+
+var defaultConsul Consul //默认的
 
 const (
 	valiStruct = 1
 	valiVar    = 2
 )
 
-func ValiStruct() va {
-	return va{t: valiStruct}
-}
-func ValiVar(tag string) va {
-	return va{
-		t:   valiVar,
-		tag: tag,
-	}
-}
-func (m va) GetJson(key string, i interface{}) {
-	getJson(key, i, &m)
+func newInt(i int) *int {
+	return &i
 }
 
-func valiVa(vaPtr *va, i interface{}) error {
-	if vaPtr == nil {
+func (m Consul) ValiStruct() Consul {
+	m.valiTypePtr = newInt(valiStruct)
+	return m
+}
+
+func (m Consul) ValiVar(tag string) Consul {
+	m.valiTypePtr = newInt(valiVar)
+	m.tag = tag
+	return m
+}
+
+func ValiStruct() Consul {
+	return Consul{valiTypePtr: newInt(valiStruct)}
+}
+func ValiVar(tag string) Consul {
+	return Consul{
+		valiTypePtr: newInt(valiVar),
+		tag:         tag,
+	}
+}
+func (m Consul) GetJson(key string, i interface{}) {
+	getJson(key, i, m)
+}
+
+func valiVa(lo Consul, i interface{}) error {
+	if lo.valiTypePtr == nil {
 		return nil
 	}
-	switch vaPtr.t {
+	switch *lo.valiTypePtr {
 	case valiStruct:
 		return vali.Struct(i)
 	case valiVar:
-		return vali.Var(i, vaPtr.tag)
+		return vali.Var(i, lo.tag)
 	default:
-		return fmt.Errorf("invalid m.t:%d", vaPtr.t)
+		return fmt.Errorf("invalid m.valiType:%d", lo.valiTypePtr)
 	}
 }
 
 var vali = validator.New()
 
-func (m va) WatchJson(key string, ptr interface{}, handler func()) {
-	watchJson(key, ptr, handler, &m)
+func (m Consul) WatchJson(key string, ptr interface{}, handler func()) {
+	watchJson(key, ptr, handler, m)
 }
 
 func WatchJson(key string, ptr interface{}, handler func()) {
-	watchJson(key, ptr, handler, nil)
+	watchJson(key, ptr, handler, defaultConsul)
 }
 
-func watchJson(key string, ptr interface{}, handler func(), vaPtr *va) {
+func watchJson(key string, ptr interface{}, handler func(), lo Consul) {
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
@@ -153,7 +194,7 @@ func watchJson(key string, ptr interface{}, handler func(), vaPtr *va) {
 				return
 			}
 			entry = entry.WithField("value", ptr)
-			if err := valiVa(vaPtr, ptr); err != nil {
+			if err := valiVa(lo, ptr); err != nil {
 				entry.WithError(err).Error("vali failed")
 				return
 			}
@@ -171,17 +212,17 @@ func watchJson(key string, ptr interface{}, handler func(), vaPtr *va) {
 	go plan.Run(Address)
 }
 
-func (m va) WatchJsonVarious(key string, i interface{}) {
-	watchJsonVarious(key, i, &m)
+func (m Consul) WatchJsonVarious(key string, i interface{}) {
+	watchJsonVarious(key, i, m)
 }
 
 //只关心修改后函数的执行
 //consul监控key对应的value的变化，然后调用函数handler(value)
 func WatchJsonVarious(key string, i interface{}) {
-	watchJsonVarious(key, i, nil)
+	watchJsonVarious(key, i, defaultConsul)
 }
 
-func watchJsonVarious(key string, i interface{}, vaPtr *va) {
+func watchJsonVarious(key string, i interface{}, lo Consul) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -189,7 +230,7 @@ func watchJsonVarious(key string, i interface{}, vaPtr *va) {
 	})
 	switch t.Kind() {
 	case reflect.Ptr:
-		watchJson(key, i, nil, vaPtr)
+		watchJson(key, i, nil, lo)
 	case reflect.Func:
 		if t.NumIn() != 1 {
 			entry.Panicf("numIn:%d != 1", t.NumIn())
@@ -200,7 +241,7 @@ func watchJsonVarious(key string, i interface{}, vaPtr *va) {
 		in0Ptr := reflect.New(in0Type).Interface() //为了避免再写一遍WatchJson而采用的偷懒做法
 		watchJson(key, in0Ptr, func() {
 			v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
-		}, vaPtr)
+		}, lo)
 	}
 }
 
@@ -216,7 +257,6 @@ func Init(address string, prefix string) {
 		entry.WithError(err).Panic("consul connect failed")
 	}
 	KV = consulClient.KV()
-	Catalog = consulClient.Catalog()
 	entry.Info("consul connect ok")
 }
 
