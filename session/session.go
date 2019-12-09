@@ -61,6 +61,7 @@ type User struct {
 	AcceptLanguage string `json:"accept_language" header:"Accept-Language"`          //设备语言
 	DeviceLanguage string `json:"device_language" header:"Device-Language"`          //app语言
 	VersionCode    int    `json:"version_code" header:"Version-Code"`                //版本号
+	SimCountry     string `json:"sim_country" header:"Sim-Country"`                  //sim卡所在地
 }
 
 //发生变化后重设UserIdentity
