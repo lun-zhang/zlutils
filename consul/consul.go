@@ -17,23 +17,22 @@ var (
 	Address string
 	Prefix  string
 	KV      *api.KV // KV is used to manipulate the K/V API
-	Catalog *api.Catalog
 )
 
 //自定义前缀，这样就可以复用配置了
-func WithPrefix(prefix string) local {
-	return local{prefixPtr: &prefix}
+func WithPrefix(prefix string) Consul {
+	return Consul{prefixPtr: &prefix}
 }
 
-func (m local) WithPrefix(prefix string) local {
+func (m Consul) WithPrefix(prefix string) Consul {
 	m.prefixPtr = &prefix
 	return m
 }
 
 func GetValue(key string) (value []byte) {
-	return getValue(key, defaultLocal)
+	return getValue(key, defaultConsul)
 }
-func getValue(key string, lo local) (value []byte) {
+func getValue(key string, lo Consul) (value []byte) {
 	entry := logrus.WithField("key", key)
 
 	prefix := Prefix
@@ -53,13 +52,13 @@ func getValue(key string, lo local) (value []byte) {
 	return pair.Value
 }
 
-func (m local) GetValue(key string) (value []byte) {
+func (m Consul) GetValue(key string) (value []byte) {
 	return getValue(key, m)
 }
 
 var kv = map[string]reflect.Value{}
 
-func getJson(key string, i interface{}, lo local) {
+func getJson(key string, i interface{}, lo Consul) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -98,17 +97,17 @@ func getJson(key string, i interface{}, lo local) {
 
 //如果对值不关心，只想要用这个值去执行一个函数，例如用于初始化日志，那么第二个参数就传入有一个入参的函数吧
 func GetJson(key string, i interface{}) {
-	getJson(key, i, defaultLocal)
+	getJson(key, i, defaultConsul)
 }
 
 //成员用指针，不为nil时候才使用对应功能
-type local struct {
+type Consul struct {
 	valiTypePtr *int
 	tag         string
 	prefixPtr   *string
 }
 
-var defaultLocal local //默认的
+var defaultConsul Consul //默认的
 
 const (
 	valiStruct = 1
@@ -119,31 +118,31 @@ func newInt(i int) *int {
 	return &i
 }
 
-func (m local) ValiStruct() local {
+func (m Consul) ValiStruct() Consul {
 	m.valiTypePtr = newInt(valiStruct)
 	return m
 }
 
-func (m local) ValiVar(tag string) local {
+func (m Consul) ValiVar(tag string) Consul {
 	m.valiTypePtr = newInt(valiVar)
 	m.tag = tag
 	return m
 }
 
-func ValiStruct() local {
-	return local{valiTypePtr: newInt(valiStruct)}
+func ValiStruct() Consul {
+	return Consul{valiTypePtr: newInt(valiStruct)}
 }
-func ValiVar(tag string) local {
-	return local{
+func ValiVar(tag string) Consul {
+	return Consul{
 		valiTypePtr: newInt(valiVar),
 		tag:         tag,
 	}
 }
-func (m local) GetJson(key string, i interface{}) {
+func (m Consul) GetJson(key string, i interface{}) {
 	getJson(key, i, m)
 }
 
-func valiVa(lo local, i interface{}) error {
+func valiVa(lo Consul, i interface{}) error {
 	if lo.valiTypePtr == nil {
 		return nil
 	}
@@ -159,15 +158,15 @@ func valiVa(lo local, i interface{}) error {
 
 var vali = validator.New()
 
-func (m local) WatchJson(key string, ptr interface{}, handler func()) {
+func (m Consul) WatchJson(key string, ptr interface{}, handler func()) {
 	watchJson(key, ptr, handler, m)
 }
 
 func WatchJson(key string, ptr interface{}, handler func()) {
-	watchJson(key, ptr, handler, defaultLocal)
+	watchJson(key, ptr, handler, defaultConsul)
 }
 
-func watchJson(key string, ptr interface{}, handler func(), lo local) {
+func watchJson(key string, ptr interface{}, handler func(), lo Consul) {
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
@@ -213,17 +212,17 @@ func watchJson(key string, ptr interface{}, handler func(), lo local) {
 	go plan.Run(Address)
 }
 
-func (m local) WatchJsonVarious(key string, i interface{}) {
+func (m Consul) WatchJsonVarious(key string, i interface{}) {
 	watchJsonVarious(key, i, m)
 }
 
 //只关心修改后函数的执行
 //consul监控key对应的value的变化，然后调用函数handler(value)
 func WatchJsonVarious(key string, i interface{}) {
-	watchJsonVarious(key, i, defaultLocal)
+	watchJsonVarious(key, i, defaultConsul)
 }
 
-func watchJsonVarious(key string, i interface{}, lo local) {
+func watchJsonVarious(key string, i interface{}, lo Consul) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -258,7 +257,6 @@ func Init(address string, prefix string) {
 		entry.WithError(err).Panic("consul connect failed")
 	}
 	KV = consulClient.KV()
-	Catalog = consulClient.Catalog()
 	entry.Info("consul connect ok")
 }
 
