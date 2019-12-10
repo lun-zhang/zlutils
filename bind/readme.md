@@ -84,9 +84,9 @@ router.POST("info/:u",bind.Wrap(Info))
 router.Run(":11151")
 ```
 ## 原理
-遍历req对象的成员，当发现存在例如Body成员则解析Body参数，Info函数接口等价于如下写法：
+遍历req对象的成员，当发现存在例如Body成员则解析Body参数，Info函数接口等价于如下OriginalInfo写法：
 ```go
-func EqualApi(c *gin.Context) {
+func OriginalInfo(c *gin.Context) {
 	var req struct {
 		Body struct {
 			B int `json:"b" binding:"required"`
@@ -128,7 +128,7 @@ func EqualApi(c *gin.Context) {
 	}
 
 	var err error
-	resp.R, err = EqualBiz(c.Request.Context(), req.Body.B, req.Uri.U, req.Query.Q, req.Header.H)
+	resp.R, err = OriginalInfoBiz(c.Request.Context(), req.Body.B, req.Uri.U, req.Query.Q, req.Header.H)
 	code.Send(c, resp, err)
 	//此处的code.Send看起来等价于
 	//if err != nil {
@@ -145,7 +145,7 @@ func EqualApi(c *gin.Context) {
 	//}
 }
 
-func EqualBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
+func OriginalInfoBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
 	r = b + u + q + h
 	return
 }
