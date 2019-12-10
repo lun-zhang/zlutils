@@ -83,3 +83,70 @@ router := gin.New()
 router.POST("info/:u",bind.Wrap(Info))
 router.Run(":11151")
 ```
+## 原理
+遍历req对象的成员，当发现存在例如Body成员则解析Body参数，Info函数接口等价于如下写法：
+```go
+func EqualApi(c *gin.Context) {
+	var req struct {
+		Body struct {
+			B int `json:"b" binding:"required"`
+		}
+		Uri struct {
+			U int `uri:"u" binding:"required"`
+		}
+		Query struct {
+			Q int `form:"q" binding:"required"`
+		}
+		Header struct {
+			H int `header:"h" binding:"required"`
+		}
+	}
+	if err := c.ShouldBindJSON(&req.Body); err != nil {
+		code.Send(c, nil, code.ClientErrBody.WithError(err))
+		//code.Send看起来等价于：
+		//c.JSON(http.StatusOK, gin.H{
+		//	"ret": 4004,
+		//	"msg": "verify body params failed",
+		//})
+		return
+	}
+	if err := c.ShouldBindUri(&req.Uri); err != nil {
+		code.Send(c, nil, code.ClientErrUri.WithError(err))
+		return
+	}
+	if err := c.ShouldBindQuery(&req.Query); err != nil {
+		code.Send(c, nil, code.ClientErrQuery.WithError(err))
+		return
+	}
+	if err := bind.ShouldBindHeader(c.Request.Header, &req.Header); err != nil {
+		code.Send(c, nil, code.ClientErrHeader.WithError(err))
+		return
+	}
+
+	var resp struct {
+		R int `json:"r"`
+	}
+
+	var err error
+	resp.R, err = EqualBiz(c.Request.Context(), req.Body.B, req.Uri.U, req.Query.Q, req.Header.H)
+	code.Send(c, resp, err)
+	//此处的code.Send看起来等价于
+	//if err != nil {
+	//	c.JSON(http.StatusOK, gin.H{
+	//		"ret": 5000,
+	//		"msg": "server error",
+	//	})
+	//} else {
+	//	c.JSON(http.StatusOK, gin.H{
+	//		"ret":  0,
+	//		"msg":  "success",
+	//		"data": resp,
+	//	})
+	//}
+}
+
+func EqualBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
+	r = b + u + q + h
+	return
+}
+```
