@@ -120,7 +120,7 @@ func TestReqPost(t *testing.T) {
 
 func TestReqGet(t *testing.T) {
 	req := Request{
-		Config: listConfig,
+		Config: listConfig.WithQuery("caller", "test"),
 		Body: MSI{
 			"pub_id": 1,
 		},

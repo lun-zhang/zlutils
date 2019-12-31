@@ -36,6 +36,13 @@ type Config struct {
 	Method string        `json:"method" validate:"oneof= GET POST PUT DELETE"`
 	Url    string        `json:"url" validate:"url"`
 	Client *ClientConfig `json:"client"`
+	query  MSI           //一些query公参，例如caller=projectName
+}
+
+func (m Config) WithQuery(k string, v interface{}) Config {
+	m.query = m.query.Clone()
+	m.query[k] = v
+	return m
 }
 
 type ClientConfig struct {
@@ -103,6 +110,18 @@ func (m *Request) AddQuery(k string, v interface{}) {
 	m.query.Add(k, to.String(v))
 }
 
+func queryAdd(query url.Values, kv MSI) {
+	for k, v := range kv {
+		if items, ok := tryGetItemsIfSlice(v); ok { //只解一层，不递归
+			for _, item := range items {
+				query.Add(k, to.String(item))
+			}
+		} else {
+			query.Add(k, to.String(v))
+		}
+	}
+}
+
 func (m Request) GetUrl(ctx context.Context) (string, error) {
 	rawUrl, err := url.Parse(m.Url)
 	if err != nil {
@@ -114,16 +133,8 @@ func (m Request) GetUrl(ctx context.Context) (string, error) {
 	for k, vs := range m.query {
 		query[k] = append(query[k], vs...)
 	}
-	for k, v := range m.Query {
-		if items, ok := tryGetItemsIfSlice(v); ok { //只解一层，不递归
-			for _, item := range items {
-				query.Add(k, to.String(item))
-			}
-		} else {
-			query.Add(k, to.String(v))
-		}
-
-	}
+	queryAdd(query, m.Query)
+	queryAdd(query, m.Config.query)
 
 	rawUrl.RawQuery = query.Encode()
 	return rawUrl.String(), nil
