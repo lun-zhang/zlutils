@@ -16,6 +16,7 @@ import (
 func TestMidUser(t *testing.T) {
 	router := gin.New()
 	router.Group("user/default", MidUser()).GET("", u)
+	router.Group("user/no_vali", WithoutValidate().MidUser()).GET("", u)
 	router.Group("user/code", code.MidRespWithErr(true),
 		MidUser()).GET("", u)
 	router.Group("", code.MidRespWithErr(true),

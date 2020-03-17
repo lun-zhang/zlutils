@@ -105,8 +105,24 @@ const (
 	ProductIdVClip      = 45
 )
 
+type withoutValidate struct{}
+
+//治标：有的服务例如share不需要一定有User-Id Device-Id
+func (withoutValidate) MidUser() gin.HandlerFunc {
+	return midUser(true)
+}
+
+//这样比MidUser加入参要不容易误用
+func WithoutValidate() withoutValidate {
+	return withoutValidate{}
+}
+
 //FIXME 感觉这个不是公用的，不改放这里
 func MidUser() gin.HandlerFunc {
+	return midUser(false)
+}
+
+func midUser(noValidate bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var err error
 		var user User
@@ -115,27 +131,28 @@ func MidUser() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
-		switch user.ProductId {
-		case ProductIdVClip:
-			if user.UserId == "" || user.DeviceId == "" {
-				err = fmt.Errorf("User-Id or Device-Id is empty") //vclip以UserId为主，所以必须有，加金币时需要Device-Id，所以两者都要有
+		if !noValidate {
+			switch user.ProductId {
+			case ProductIdVClip:
+				if user.UserId == "" || user.DeviceId == "" {
+					err = fmt.Errorf("User-Id or Device-Id is empty") //vclip以UserId为主，所以必须有，加金币时需要Device-Id，所以两者都要有
+				}
+			case ProductIdVideoBuddy:
+				if user.UserId == "" && user.DeviceId == "" {
+					err = fmt.Errorf("User-Id and Device-Id are empty")
+				}
+			default:
+				//TODO 后续增加新类型
 			}
-		case ProductIdVideoBuddy:
-			if user.UserId == "" && user.DeviceId == "" {
-				err = fmt.Errorf("User-Id and Device-Id are empty")
+			if err != nil {
+				logrus.WithContext(c.Request.Context()).WithError(err).Warn()
+				code.Send(c, nil, code.ClientErrHeader.WithErrorf("invalid user, %s", err.Error()))
+				c.Abort()
+				return
 			}
-		default:
-			//TODO 后续增加新类型
 		}
-		if err != nil {
-			logrus.WithContext(c.Request.Context()).WithError(err).Warn()
-			code.Send(c, nil, code.ClientErrHeader.WithErrorf("invalid user, %s", err.Error()))
-			c.Abort()
-		} else {
-			user.refreshUserIdentity()
-			c.Set(keyUser, user)
-		}
+		user.refreshUserIdentity()
+		c.Set(keyUser, user)
 	}
 }
 
