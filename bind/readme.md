@@ -150,3 +150,74 @@ func OriginalInfoBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
 	return
 }
 ```
+
+## 自由！随意定义响应！
+无论你的响应结构是用：
+```json
+{
+  "ret":0,
+  "msg":"success",
+  "data":"业务数据"
+}
+```
+还是用：
+```json
+{
+  "code":0,
+  "result":"ok",
+  "xxx":"业务数据"
+}
+```
+甚至是：
+```json
+{
+  "xxx":???,
+  "yyy":???
+}
+```
+都是你的自由；  
+无论你的http状态码是用`200`、`400`、`500`区分，还是全部用`200`然后用业务`code`区分，都是你的自由!  
+### 示例：  
+定义入参出参
+```go
+func UseMySender(ctx context.Context, req struct {
+	Query struct {
+		Q int `form:"q" binding:"required"`
+	}
+	Body struct {
+		B int `json:"b" binding:"required"`
+	}
+}) (code int, obj interface{}) {
+	switch req.Body.B {
+	case 1:
+		return http.StatusInternalServerError, gin.H{
+			"ret": 5,
+			"msg": "server error when use sender",
+		}
+	case 2:
+		return http.StatusOK, gin.H{
+			"ret":  0,
+			"msg":  "success when use sender",
+			"data": 123,
+			"tile": 456, //随意定义
+		}
+	default:
+		return http.StatusOK, 1
+	}
+}
+```
+定义你自己的入参绑定错误处理Sender、结果处理Sender，然后跑起来
+```go
+router := gin.New()
+router.POST("sender", WithSender(
+	func(c *gin.Context, reqFieldName string, bindErr error) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"field":  reqFieldName,
+			"result": bindErr.Error(),
+		})
+	},
+	func(c *gin.Context, code int, obj interface{}) {
+		c.JSON(code, obj)
+	}).Wrap(UseMySender))
+router.Run(":11152")
+```

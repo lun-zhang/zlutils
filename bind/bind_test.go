@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"net/http"
 	"reflect"
 	"testing"
 	"zlutils/caller"
@@ -144,4 +145,45 @@ func TestA(t *testing.T) {
 	b.Set(reflect.ValueOf("def"))
 	fmt.Println(b)
 	//checkReqType(reflect.TypeOf(req))
+}
+
+func TestWithSender(t *testing.T) {
+	router := gin.New()
+	router.POST("sender", WithSender(
+		func(c *gin.Context, reqFieldName string, bindErr error) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"field":  reqFieldName,
+				"result": bindErr.Error(),
+			})
+		},
+		func(c *gin.Context, code int, obj interface{}) {
+			c.JSON(code, obj)
+		}).Wrap(UseMySender))
+	router.Run(":11152")
+}
+
+func UseMySender(ctx context.Context, req struct {
+	Query struct {
+		Q int `form:"q" binding:"required"` //请求的query结构
+	}
+	Body struct {
+		B int `json:"b" binding:"required"` //请求的body结构
+	}
+}) (code int, obj interface{}) { //code是http状态码，obj会被转成成json作为响应
+	switch req.Body.B {
+	case 1:
+		return http.StatusInternalServerError, gin.H{
+			"ret": 5,
+			"msg": "server error when use sender",
+		}
+	case 2:
+		return http.StatusOK, gin.H{
+			"ret":  0,
+			"msg":  "success when use sender",
+			"data": 123,
+			"tile": 456, //随意定义
+		}
+	default:
+		return http.StatusOK, 1
+	}
 }
