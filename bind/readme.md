@@ -182,12 +182,12 @@ func OriginalInfoBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
 ```go
 func UseMySender(ctx context.Context, req struct {
 	Query struct {
-		Q int `form:"q" binding:"required"`
+		Q int `form:"q" binding:"required"` //请求的query结构
 	}
 	Body struct {
-		B int `json:"b" binding:"required"`
+		B int `json:"b" binding:"required"` //请求的body结构
 	}
-}) (code int, obj interface{}) {
+}) (code int, obj interface{}) { //code是http状态码，obj会被转成成json作为响应
 	switch req.Body.B {
 	case 1:
 		return http.StatusInternalServerError, gin.H{
