@@ -178,7 +178,7 @@ func OriginalInfoBiz(ctx context.Context, b, u, q, h int) (r int, err error) {
 都是你的自由；  
 无论你的http状态码是用`200`、`400`、`500`区分，还是全部用`200`然后用业务`code`区分，都是你的自由!  
 ### 示例：  
-定义入参出参
+定义请求、响应结构
 ```go
 func UseMySender(ctx context.Context, req struct {
 	Query struct {
