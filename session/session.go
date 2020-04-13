@@ -103,6 +103,8 @@ func (m Meta) GetUser() User {
 const (
 	ProductIdVideoBuddy = 39
 	ProductIdVClip      = 45
+	ProductIdManiGames  = 49
+	ProductIdFunnyStar  = 50
 )
 
 type withoutValidate struct{}

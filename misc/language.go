@@ -19,4 +19,5 @@ const (
 	LangHaryanvi   = "Haryanvi" //哈里扬维
 	LangRajasthani = "raj"      //拉贾斯坦尼
 	LangIndonesian = "id-ID"    //印尼语
+	LangVietnamese = "vi-VN"    //越南语
 )
