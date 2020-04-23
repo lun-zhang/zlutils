@@ -35,10 +35,10 @@ func checkReqType(t reflect.Type, has map[string]struct{}) {
 			}
 			has[ti.Name] = struct{}{}
 			switch ti.Name {
-			case reqFieldNameBody:
-			case reqFieldNameQuery:
-			case reqFieldNameUri:
-			case reqFieldNameHeader:
+			case ReqFieldNameBody:
+			case ReqFieldNameQuery:
+			case ReqFieldNameUri:
+			case ReqFieldNameHeader:
 			case reqFieldNameMeta:
 			case reqFieldNameC:
 			default: //在启动时就把非法的字段暴露出来，避免请求到了才知道字段定义错了
@@ -48,7 +48,19 @@ func checkReqType(t reflect.Type, has map[string]struct{}) {
 	}
 }
 
+type wrapper struct {
+	reqErrSender reqErrSenderFunc
+	resultSender resultSenderFunc
+}
+
+func (m wrapper) Wrap(api interface{}) gin.HandlerFunc {
+	return wrap(api, m.reqErrSender, m.resultSender)
+}
+
 func Wrap(api interface{}) gin.HandlerFunc {
+	return wrap(api, nil, nil)
+}
+func wrap(api interface{}, reqErrSender reqErrSenderFunc, resultSender resultSenderFunc) gin.HandlerFunc {
 	fv := reflect.ValueOf(api)
 	ft := reflect.TypeOf(api)
 	entry := logrus.WithFields(logrus.Fields{
@@ -61,13 +73,22 @@ func Wrap(api interface{}) gin.HandlerFunc {
 	}
 
 	numOut := ft.NumOut()
-	if numOut > 2 {
-		entry.Fatalf("numOut:%d bigger than 2", numOut)
-	}
+	if resultSender != nil {
+		if numOut != 2 { //当自定义sender时，必须只能有2个出参
+			entry.Fatalf("numOut:%d ne 2 when with sender", numOut)
+		}
+		if codeType := ft.Out(0); codeType.Kind() != reflect.Int {
+			entry.Fatalf("out(0) kind:%s isn't int", codeType.Kind())
+		}
+	} else {
+		if numOut > 2 {
+			entry.Fatalf("numOut:%d bigger than 2", numOut)
+		}
 
-	if numOut == 2 {
-		if errType := ft.Out(1); !isErrType(errType) { //第二个出参必须是error类型
-			entry.Fatalf("out(1) type:%s isn't error", errType.Name())
+		if numOut == 2 {
+			if errType := ft.Out(1); !isErrType(errType) { //第二个出参必须是error类型
+				entry.Fatalf("out(1) type:%s isn't error", errType.Name())
+			}
 		}
 	}
 
@@ -93,10 +114,24 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		//处理请求参数
 		in := []reflect.Value{reflect.ValueOf(ctx)}
 		if reqType != nil {
-			reqValue, err := shouldBindReq(c, reqType)
+			reqValue, reqFieldName, err := shouldBindReq(c, reqType)
 			if err != nil {
-				entry.WithError(err).Warn()
-				code.Send(c, nil, err)
+				if reqErrSender != nil {
+					reqErrSender(c, reqFieldName, err)
+				} else {
+					switch reqFieldName {
+					case ReqFieldNameBody:
+						err = code.ClientErrBody.WithError(err)
+					case ReqFieldNameQuery:
+						err = code.ClientErrQuery.WithError(err)
+					case ReqFieldNameUri:
+						err = code.ClientErrUri.WithError(err)
+					case ReqFieldNameHeader:
+						err = code.ClientErrHeader.WithError(err)
+					}
+					entry.WithError(err).Warn()
+					code.Send(c, nil, err)
+				}
 				c.Abort()
 				return
 			}
@@ -106,25 +141,31 @@ func Wrap(api interface{}) gin.HandlerFunc {
 		//响应
 		out := fv.Call(in)
 
-		var resp interface{}
-		var err error
+		if resultSender != nil {
+			_code := out[0].Interface().(int)
+			obj := out[1].Interface()
+			resultSender(c, _code, obj) //有resultSender时前面限制了必定有一个出参
+		} else {
+			var resp interface{}
+			var err error
 
-		switch numOut {
-		case 1: //NOTE: 返回只有一个参数的时候，如果是error类型则被认为是err，因此如果想要让返回err类型的resp时候，必须用2个返回参数(resp,err)
-			if isErrType(out[0].Type()) { //(err)
-				if !out[0].IsNil() { //nil.(error)会panic
-					err = out[0].Interface().(error)
+			switch numOut {
+			case 1: //NOTE: 返回只有一个参数的时候，如果是error类型则被认为是err，因此如果想要让返回err类型的resp时候，必须用2个返回参数(resp,err)
+				if isErrType(out[0].Type()) { //(err)
+					if !out[0].IsNil() { //nil.(error)会panic
+						err = out[0].Interface().(error)
+					}
+				} else { //(resp)
+					resp = out[0].Interface()
 				}
-			} else { //(resp)
+			case 2: //(resp,err)
 				resp = out[0].Interface()
+				if !out[1].IsNil() {
+					err = out[1].Interface().(error)
+				}
 			}
-		case 2: //(resp,err)
-			resp = out[0].Interface()
-			if !out[1].IsNil() {
-				err = out[1].Interface().(error)
-			}
+			code.Send(c, resp, err)
 		}
-		code.Send(c, resp, err)
 	}
 }
 
@@ -133,57 +174,42 @@ var bindFuncs = []struct {
 	bindFunc func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error)
 }{
 	{
-		name: reqFieldNameBody,
+		name: ReqFieldNameBody,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
 			if _, ok := tagMap[tagReuseBody]; ok {
 				err = c.ShouldBindBodyWith(obj, binding.JSON)
 			} else {
 				err = c.ShouldBindJSON(obj)
 			}
-			if err != nil {
-				err = code.ClientErrBody.WithError(err)
-				return
-			}
 			return
 		},
 	},
 
 	{
-		name: reqFieldNameQuery,
+		name: ReqFieldNameQuery,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
-			if err = c.ShouldBindQuery(obj); err != nil {
-				err = code.ClientErrQuery.WithError(err)
-				return
-			}
-			return
+			return c.ShouldBindQuery(obj)
 		},
 	},
 	{
-		name: reqFieldNameUri,
+		name: ReqFieldNameUri,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
-			if err = c.ShouldBindUri(obj); err != nil {
-				err = code.ClientErrUri.WithError(err)
-				return
-			}
-			return
+			return c.ShouldBindUri(obj)
 		},
 	},
 	{
-		name: reqFieldNameHeader,
+		name: ReqFieldNameHeader,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
-			if err = ShouldBindHeader(c.Request.Header, obj); err != nil {
-				err = code.ClientErrHeader.WithError(err)
-				return
-			}
-			return
+			return ShouldBindHeader(c.Request.Header, obj)
 		},
 	},
 }
 
-func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, err error) {
+func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value, reqFieldName string, err error) {
 	reqValue = reflect.New(reqType).Elem()
 
 	for _, bf := range bindFuncs {
+		reqFieldName = bf.name
 		if fieldType, ok := reqType.FieldByName(bf.name); ok {
 			fieldValuePtr := reflect.New(fieldType.Type).Interface()
 
@@ -214,10 +240,10 @@ func shouldBindReq(c *gin.Context, reqType reflect.Type) (reqValue reflect.Value
 }
 
 const (
-	reqFieldNameBody   = "Body"
-	reqFieldNameQuery  = "Query"
-	reqFieldNameUri    = "Uri"
-	reqFieldNameHeader = "Header"
+	ReqFieldNameBody   = "Body"
+	ReqFieldNameQuery  = "Query"
+	ReqFieldNameUri    = "Uri"
+	ReqFieldNameHeader = "Header"
 	reqFieldNameMeta   = "Meta"
 	reqFieldNameC      = "C"
 )
@@ -227,3 +253,33 @@ const (
 	tagReuseBody   = "reuse_body"
 	tagIgnoreError = "ignore_error"
 )
+
+type reqErrSenderFunc func(c *gin.Context, reqFieldName string, bindErr error)
+
+//后两个入参参数就是c.JSON的两个入参
+type resultSenderFunc func(c *gin.Context, code int, obj interface{})
+
+func WithSender(reqErrSender reqErrSenderFunc, resultSender resultSenderFunc) wrapper {
+	return wrapper{
+		resultSender: resultSender,
+		reqErrSender: reqErrSender,
+	}
+}
+
+//func WithReqBindErrSender(reqErrSender reqErrSenderFunc) wrapper {
+//	return wrapper{}.WithReqBindErrSender(reqErrSender)
+//}
+//
+//func WithResultSender(resultSender resultSenderFunc) wrapper {
+//	return wrapper{}.WithResultSender(resultSender)
+//}
+//
+//func (m wrapper) WithReqBindErrSender(reqErrSender reqErrSenderFunc) wrapper {
+//	m.reqErrSender = reqErrSender
+//	return m
+//}
+//
+//func (m wrapper) WithResultSender(resultSender resultSenderFunc) wrapper {
+//	m.resultSender = resultSender
+//	return m
+//}
