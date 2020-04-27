@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"zlutils/bind"
 	"zlutils/code"
 	"zlutils/meta"
 	"zlutils/request"
@@ -128,7 +127,7 @@ func midUser(noValidate bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var err error
 		var user User
-		if err = bind.ShouldBindHeader(c.Request.Header, &user); err != nil {
+		if err = c.ShouldBindHeader(&user); err != nil {
 			code.Send(c, nil, code.ClientErrHeader.WithError(err))
 			c.Abort()
 			return

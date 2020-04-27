@@ -200,7 +200,7 @@ var bindFuncs = []struct {
 	{
 		name: ReqFieldNameHeader,
 		bindFunc: func(c *gin.Context, obj interface{}, tagMap map[string]struct{}) (err error) {
-			return ShouldBindHeader(c.Request.Header, obj)
+			return c.ShouldBindHeader(obj)
 		},
 	},
 }
