@@ -75,7 +75,7 @@ func noReq(ctx context.Context) (resp interface{}, err error) {
 
 func Info(ctx context.Context, req struct {
 	Body struct {
-		B int `json:"b" binding:"required"`
+		B int `json:"b" binding:"required,oneof=1 2 3"`
 	}
 	Uri struct {
 		U int `uri:"u" binding:"required"`
