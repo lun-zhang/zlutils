@@ -5,6 +5,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/lun-zhang/gorm"
 	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
 	"time"
 )
 
@@ -116,4 +118,54 @@ func (my Config) setConns(db *sql.DB) {
 type ConfigMasterAndSlave struct {
 	Master Config `json:"master"`
 	Slave  Config `json:"slave"`
+}
+
+//获取gorm列，忽略omits指定的列，主要用于解决Save不存在会插入、Updates不会更新更新零值的问题
+func OmitColumns(value interface{}, omits ...string) (m map[string]interface{}) {
+	ignore := map[string]struct{}{}
+	for _, o := range omits {
+		ignore[o] = struct{}{}
+	}
+
+	m = map[string]interface{}{}
+	omitColumns(reflect.ValueOf(value), ignore, m)
+	return
+}
+
+func omitColumns(v reflect.Value, ignore map[string]struct{}, m map[string]interface{}) {
+	if v.Kind() != reflect.Struct {
+		return
+	}
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		vi := v.Field(i)
+		ti := t.Field(i)
+		if ti.Anonymous {
+			omitColumns(vi, ignore, m)
+		} else {
+			if name, ok := getGormColumnName(ti); ok {
+				if _, ok := ignore[name]; !ok {
+					m[name] = vi.Interface()
+				}
+			}
+		}
+	}
+}
+
+//简单处理：定义了column了才是有效的
+func getGormColumnName(ti reflect.StructField) (string, bool) {
+	if n := ti.Name[0]; !(n >= 'A' && n <= 'Z') { //非导出的却有gorm标签的
+		return "", false
+	}
+	tag := ti.Tag.Get("gorm")
+	for _, p := range strings.Split(tag, ";") {
+		if strings.HasPrefix(p, "column:") {
+			name := p[len("column:"):]
+			if name == "" {
+				return "", false
+			}
+			return name, true
+		}
+	}
+	return "", false
 }

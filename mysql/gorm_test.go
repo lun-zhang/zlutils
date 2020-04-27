@@ -27,17 +27,26 @@ func TestGorm(t *testing.T) {
 			MaxOpenConns: 5,
 		},
 	})
-	var cs Counter
+	var cs []Counter
 	if err := db.Master().Find(&cs).Error; err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println(cs)
+	if len(cs) > 0 {
+		fmt.Println(cs[0])
+	}
 }
 
 type Counter struct {
+	Id           int64  `gorm:"column:id;primary_key"`
 	BehaviorType string `gorm:"column:behavior_type"`
-	PubId        int64  `gorm:"column:pub_id"`
-	Count        int64  `gorm:"column:count"`
+	An
+	unexported string `gorm:"column:unexported"`
+}
+
+type An struct {
+	PubId int64 `gorm:"column:pub_id"`
+	Count int64 `gorm:"column:count"`
 }
 
 func (Counter) TableName() string {
@@ -108,4 +117,31 @@ func TestMetricLogger_Print(t *testing.T) {
 		}
 	}()
 	router.Run(":11119")
+}
+
+func TestOmitColumns(t *testing.T) {
+	c := Counter{
+		Id:           1,
+		BehaviorType: "a",
+		An: An{
+			PubId: 2,
+			Count: 3,
+		},
+		unexported: "un",
+	}
+
+	for i, test := range []struct {
+		omits []string
+	}{
+		{[]string{}},
+		{[]string{"id"}},
+		{[]string{"behavior_type"}},
+		{[]string{"pub_id"}},
+		{[]string{"behavior_type"}},
+		{[]string{"id", "behavior_type"}},
+		{[]string{"id", "behavior_type", "pub_id"}},
+		{[]string{"id", "behavior_type", "pub_id", "count"}},
+	} {
+		fmt.Println(i, test.omits, OmitColumns(c, test.omits...))
+	}
 }
