@@ -86,3 +86,14 @@ go: errors parsing go.mod:
 [url "git@xlbj-gitlab.xunlei.cn:"]
     insteadOf = https://xlbj-gitlab.xunlei.cn/
 ```
+
+## 1.13以上报错：reading sum.golang.org 410 Gone
+```
+go: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0/go.mod: verifying module: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0/go.mod: reading https://sum.golang.org/lookup/xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0: 410 Gone
+        server response: not found: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0: unrecognized import path "xlbj-gitlab.xunlei.cn/oversea/zlutils/v7": https fetch: Get "https://xlbj-gitlab.xunlei.cn/oversea/zlutils/v7?go-get=1": dial tcp 47.103.68.13:443: connect: connection refused
+```
+1.13之后设置了默认的GOSUMDB=sum.golang.org  
+所以要执行以下命令关闭：
+```
+go env -w GOSUMDB=off
+```
