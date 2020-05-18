@@ -1,4 +1,4 @@
-module xlbj-gitlab.xunlei.cn/oversea/zlutils/v7
+module gitlab.xunlei.cn/xl-overseas-server/zlutils/v7
 
 go 1.12
 
