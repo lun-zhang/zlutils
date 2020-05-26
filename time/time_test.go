@@ -32,8 +32,15 @@ func TestDuration(t *testing.T) {
 	fmt.Println(d)
 }
 
-func TestGetIndianZeroUTC(t *testing.T) {
-	fmt.Println(GetIndianZeroUTC(time.Now()))
+func TestGetIndianZeroUTC(_ *testing.T) {
+	//t := time.Now()
+
+	t, err := time.Parse(time.RFC3339, "2006-01-02T02:00:00+05:30")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(GetIndianZeroUTC(t).Equal(GetZoneZeroUTC(t)))
 }
 
 //自定义类型，如何让标签有效
