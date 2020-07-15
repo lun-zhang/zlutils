@@ -11,13 +11,16 @@ require (
 	github.com/gosexy/to v0.0.0-20141221203644-c20e083e3123
 	github.com/hashicorp/consul/api v1.1.0
 	github.com/hashicorp/go-uuid v1.0.1
+	github.com/kr/pretty v0.2.0 // indirect
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/lun-zhang/gorm v1.13.3
 	github.com/prometheus/client_golang v0.9.3
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/net v0.0.0-20190514140710-3ec191127204
+	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/redis.v5 v5.2.9
+	gopkg.in/yaml.v2 v2.2.8
 	zlutils v0.0.0
 )
 
-replace zlutils v0.0.0 => ../zlutils
+replace zlutils v0.0.0 => ./

@@ -3,12 +3,11 @@ package consul
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
 	"github.com/sirupsen/logrus"
-	"net/http"
+	"gopkg.in/yaml.v2"
 	"reflect"
 	"zlutils/mysql"
 )
@@ -58,7 +57,9 @@ func (m Consul) GetValue(key string) (value []byte) {
 
 var kv = map[string]reflect.Value{}
 
-func getJson(key string, i interface{}, lo Consul) {
+type Unmarshal func(data []byte, v interface{}) error
+
+func getJson(key string, i interface{}, lo Consul, unmarshal Unmarshal) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -69,7 +70,7 @@ func getJson(key string, i interface{}, lo Consul) {
 	case reflect.Ptr:
 		value := getValue(key, lo)
 		entry = entry.WithField("bs", string(value))
-		if err := json.Unmarshal(value, i); err != nil {
+		if err := unmarshal(value, i); err != nil {
 			entry.WithError(err).Panic("consul value invalid")
 		}
 		entry = entry.WithField("value", i)
@@ -87,7 +88,7 @@ func getJson(key string, i interface{}, lo Consul) {
 
 		in0Type := t.In(0)
 		in0Ptr := reflect.New(in0Type).Interface()
-		getJson(key, in0Ptr, lo)
+		getJson(key, in0Ptr, lo, unmarshal)
 		v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
 		return
 	default:
@@ -97,7 +98,11 @@ func getJson(key string, i interface{}, lo Consul) {
 
 //如果对值不关心，只想要用这个值去执行一个函数，例如用于初始化日志，那么第二个参数就传入有一个入参的函数吧
 func GetJson(key string, i interface{}) {
-	getJson(key, i, defaultConsul)
+	getJson(key, i, defaultConsul, json.Unmarshal)
+}
+
+func GetYaml(key string, i interface{}) {
+	getJson(key, i, defaultConsul, yaml.Unmarshal)
 }
 
 //成员用指针，不为nil时候才使用对应功能
@@ -139,7 +144,11 @@ func ValiVar(tag string) Consul {
 	}
 }
 func (m Consul) GetJson(key string, i interface{}) {
-	getJson(key, i, m)
+	getJson(key, i, m, json.Unmarshal)
+}
+
+func (m Consul) GetYaml(key string, i interface{}) {
+	getJson(key, i, m, yaml.Unmarshal)
 }
 
 func valiVa(lo Consul, i interface{}) error {
@@ -159,14 +168,21 @@ func valiVa(lo Consul, i interface{}) error {
 var vali = validator.New()
 
 func (m Consul) WatchJson(key string, ptr interface{}, handler func()) {
-	watchJson(key, ptr, handler, m)
+	watchJson(key, ptr, handler, m, json.Unmarshal)
+}
+func (m Consul) WatchYaml(key string, ptr interface{}, handler func()) {
+	watchJson(key, ptr, handler, m, yaml.Unmarshal)
 }
 
 func WatchJson(key string, ptr interface{}, handler func()) {
-	watchJson(key, ptr, handler, defaultConsul)
+	watchJson(key, ptr, handler, defaultConsul, json.Unmarshal)
 }
 
-func watchJson(key string, ptr interface{}, handler func(), lo Consul) {
+func WatchYaml(key string, ptr interface{}, handler func()) {
+	watchJson(key, ptr, handler, defaultConsul, yaml.Unmarshal)
+}
+
+func watchJson(key string, ptr interface{}, handler func(), lo Consul, unmarshal Unmarshal) {
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
 		"key":  fmt.Sprintf("%s/%s", Prefix, key),
@@ -189,7 +205,7 @@ func watchJson(key string, ptr interface{}, handler func(), lo Consul) {
 			value = kv.Value
 			entry = entry.WithField("bs", string(value))
 			mysql.SetZero(ptr) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
-			if err := json.Unmarshal(value, ptr); err != nil {
+			if err := unmarshal(value, ptr); err != nil {
 				entry.WithError(err).Errorf("consul watch unmarshal json failed")
 				return
 			}
@@ -213,16 +229,24 @@ func watchJson(key string, ptr interface{}, handler func(), lo Consul) {
 }
 
 func (m Consul) WatchJsonVarious(key string, i interface{}) {
-	watchJsonVarious(key, i, m)
+	watchJsonVarious(key, i, m, json.Unmarshal)
+}
+
+func (m Consul) WatchYamlVarious(key string, i interface{}) {
+	watchJsonVarious(key, i, m, yaml.Unmarshal)
 }
 
 //只关心修改后函数的执行
 //consul监控key对应的value的变化，然后调用函数handler(value)
 func WatchJsonVarious(key string, i interface{}) {
-	watchJsonVarious(key, i, defaultConsul)
+	watchJsonVarious(key, i, defaultConsul, json.Unmarshal)
 }
 
-func watchJsonVarious(key string, i interface{}, lo Consul) {
+func WatchYamlVarious(key string, i interface{}) {
+	watchJsonVarious(key, i, defaultConsul, yaml.Unmarshal)
+}
+
+func watchJsonVarious(key string, i interface{}, lo Consul, unmarshal Unmarshal) {
 	t := reflect.TypeOf(i)
 	entry := logrus.WithFields(logrus.Fields{
 		"key":  key,
@@ -230,7 +254,7 @@ func watchJsonVarious(key string, i interface{}, lo Consul) {
 	})
 	switch t.Kind() {
 	case reflect.Ptr:
-		watchJson(key, i, nil, lo)
+		watchJson(key, i, nil, lo, unmarshal)
 	case reflect.Func:
 		if t.NumIn() != 1 {
 			entry.Panicf("numIn:%d != 1", t.NumIn())
@@ -241,7 +265,7 @@ func watchJsonVarious(key string, i interface{}, lo Consul) {
 		in0Ptr := reflect.New(in0Type).Interface() //为了避免再写一遍WatchJson而采用的偷懒做法
 		watchJson(key, in0Ptr, func() {
 			v.Call([]reflect.Value{reflect.ValueOf(in0Ptr).Elem()})
-		}, lo)
+		}, lo, unmarshal)
 	}
 }
 
@@ -258,31 +282,4 @@ func Init(address string, prefix string) {
 	}
 	KV = consulClient.KV()
 	entry.Info("consul connect ok")
-}
-
-func BindRouter(group *gin.RouterGroup) {
-	config := group.Group("consul/kv")
-	var ks []string
-	for k, v := range kv {
-		ks = append(ks, k)
-		config.GET(k, func(v reflect.Value) gin.HandlerFunc {
-			return func(c *gin.Context) {
-				c.JSON(http.StatusOK, v.Interface())
-			}
-		}(v))
-		config.PUT(k, func(v reflect.Value) gin.HandlerFunc {
-			return func(c *gin.Context) {
-				reqBodyPtr := reflect.New(v.Elem().Type()).Interface() //创建一个空的
-				if err := c.ShouldBindJSON(reqBodyPtr); err != nil {
-					c.JSON(http.StatusBadRequest, err.Error())
-					return
-				}
-				v.Elem().Set(reflect.ValueOf(reqBodyPtr).Elem())
-				c.JSON(http.StatusOK, v.Interface())
-			}
-		}(v))
-	}
-	config.GET("", func(c *gin.Context) {
-		c.JSON(http.StatusOK, ks)
-	})
 }

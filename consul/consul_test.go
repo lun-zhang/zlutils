@@ -2,7 +2,6 @@ package consul
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"testing"
 	"time"
 	"zlutils/logger"
@@ -32,22 +31,16 @@ func TestGetJson(t *testing.T) {
 	fmt.Println(tmp)
 }
 
-func TestBindRouter(t *testing.T) {
+func TestGetYaml(t *testing.T) {
 	Init(":8500", "test/service/counter")
-	var a struct {
-		I int `json:"i" validate:"min=2" binding:"min=2"`
+	var ty struct {
+		I int               `yaml:"i" validate:"required"`
+		S string            `yaml:"s" validate:"required"`
+		M map[string]string `yaml:"m" validate:"required"`
+		F float64           `yaml:"f" validate:"required"`
 	}
-	var log logger.Config
-	GetJson("a", &a)
-	GetJson("log", &log)
-	var m map[string]struct{}
-	GetJson("m", &m)
-
-	r := gin.New()
-	admin := r.Group("admin")
-
-	BindRouter(admin)
-	r.Run(":11130")
+	ValiStruct().GetYaml("t.yaml", &ty)
+	fmt.Println(ty)
 }
 
 func TestGetJsonValiStruct(t *testing.T) {
