@@ -16,6 +16,7 @@ var (
 	Address string
 	Prefix  string
 	KV      *api.KV // KV is used to manipulate the K/V API
+	Client  *api.Client
 )
 
 //自定义前缀，这样就可以复用配置了
@@ -280,6 +281,7 @@ func Init(address string, prefix string) {
 	if err != nil {
 		entry.WithError(err).Panic("consul connect failed")
 	}
+	Client = consulClient
 	KV = consulClient.KV()
 	entry.Info("consul connect ok")
 }
