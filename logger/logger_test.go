@@ -117,3 +117,14 @@ func TestWatchByConsul(t *testing.T) {
 		logrus.Warn("w")
 	}
 }
+
+func TestSetComFields(t *testing.T) {
+	Init(Config{Level: logrus.DebugLevel})
+	SetComFields(logrus.Fields{
+		"git_commit_id": "abc",
+		"git_branch":    "test",
+	})
+
+	logrus.Info()
+	logrus.WithField("git_commit_id", "def").Info() //域冲突则自定义的优先
+}

@@ -29,6 +29,20 @@ const (
 	FieldTimeUnix = "time_unix"
 )
 
+//公共域，优先级低于常规打日志时候的域
+//TODO: 像是level这样不在Data里的后续再看
+var comFields = logrus.Fields{}
+
+func SetComField(key string, value interface{}) {
+	comFields[key] = value
+}
+
+func SetComFields(fields logrus.Fields) {
+	for k, v := range fields {
+		SetComField(k, v)
+	}
+}
+
 func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 	if MetricCounter != nil {
 		MetricCounter(e).Inc()
@@ -46,6 +60,13 @@ func (f MyFormatter) Format(e *logrus.Entry) (serialized []byte, err error) {
 	traceId := xray.GetTraceId(e.Context)
 	if traceId != "" {
 		e.Data[FieldTraceId] = traceId
+	}
+
+	//填充公共域
+	for k, v := range comFields {
+		if _, ok := e.Data[k]; !ok {
+			e.Data[k] = v
+		}
 	}
 
 	serialized, err = f.JSONFormatter.Format(e)
