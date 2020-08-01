@@ -7,6 +7,7 @@ import (
 	"time"
 	"zlutils/caller"
 	"zlutils/code"
+	"zlutils/logger"
 )
 
 func Mid() gin.HandlerFunc {
@@ -14,7 +15,9 @@ func Mid() gin.HandlerFunc {
 		defer func() {
 			if rec := recover(); rec != nil {
 				//FIXME: 依赖了code包，作为更基础的包似乎应该解依赖
-				code.Send(c, nil, code.ServerErrPainc.WithErrorf("panic: %+v", rec))
+				err := code.ServerErrPainc.WithErrorf("panic: %+v", rec)
+				logrus.WithContext(c.Request.Context()).WithError(err).WithField(logger.FieldStack, caller.DebugStack()).Error()
+				code.Send(c, nil, err)
 			}
 		}()
 		c.Next()

@@ -2,13 +2,14 @@ package caller
 
 import (
 	"fmt"
-	"regexp"
 	"runtime"
+	"runtime/debug"
+	"strings"
 )
 
 const unknown = "unknown"
 
-var pr *regexp.Regexp
+var pj string
 
 func Stack(skip int) (names []string) {
 	for i := skip; ; i++ {
@@ -16,7 +17,7 @@ func Stack(skip int) (names []string) {
 		if s == unknown {
 			break
 		}
-		if pr != nil && !pr.MatchString(s) {
+		if pj != "" && !strings.Contains(s, pj) {
 			continue //NOTE: 调用栈太长了，只打印服务内的
 		}
 		names = append(names, s)
@@ -33,5 +34,19 @@ func Caller(skip int) (name string) {
 }
 
 func Init(projectName string) {
-	pr = regexp.MustCompile(projectName)
+	pj = projectName
+}
+
+func DebugStack() (names []string) {
+	for _, s := range strings.Split(string(debug.Stack()), "\n") {
+		if pj != "" && !strings.Contains(s, pj) {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		names = append(names, s)
+	}
+	return
 }
