@@ -184,9 +184,14 @@ func WatchYaml(key string, ptr interface{}, handler func()) {
 }
 
 func watchJson(key string, ptr interface{}, handler func(), lo Consul, unmarshal Unmarshal) {
+	prefix := Prefix
+	if lo.prefixPtr != nil {
+		prefix = *lo.prefixPtr
+	}
+
 	plan, err := watch.Parse(map[string]interface{}{
 		"type": "key",
-		"key":  fmt.Sprintf("%s/%s", Prefix, key),
+		"key":  fmt.Sprintf("%s/%s", prefix, key),
 	})
 	if err != nil {
 		logrus.WithField("key", key).
