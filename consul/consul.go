@@ -198,6 +198,10 @@ func watchJson(key string, ptr interface{}, handler func(), lo Consul, unmarshal
 			WithError(err).
 			Panic("consul watch parse failed")
 	}
+	getJson(key, ptr, lo, unmarshal)
+	if handler != nil {
+		handler()
+	}
 	plan.Handler = func(idx uint64, raw interface{}) {
 		entry := logrus.WithField("key", key)
 		var value []byte
