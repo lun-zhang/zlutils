@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"testing"
@@ -18,15 +19,15 @@ func p(c *gin.Context) {
 }
 
 func TestBefore(t *testing.T) {
-	fmt.Println(f1())
+	fmt.Println(f1(context.Background()))
 }
 
-func f1() (err error) {
-	defer BeforeCtx(nil)(&err)
-	return f2()
+func f1(ctx context.Context) (err error) {
+	defer BeforeCtx(&ctx)(&err)
+	return f2(ctx)
 }
-func f2() (err error) {
-	defer BeforeCtx(nil)(&err)
+func f2(ctx context.Context) (err error) {
+	defer BeforeCtx(&ctx)(&err)
 	panic(1)
 }
 
