@@ -197,6 +197,11 @@ func (m RespRet) Check() error {
 	return nil
 }
 
+type RespEmpty struct{} //no check
+func (m RespEmpty) Check() error {
+	return nil
+}
+
 //从logger里复制过来的
 func tryGetJson(header http.Header, b []byte) (resp interface{}) {
 	if strings.Contains(header.Get("Content-Type"), "application/json") {
