@@ -1,7 +1,9 @@
 package misc
 
 import (
+	"fmt"
 	"testing"
+	"time"
 )
 
 func TestMin(t *testing.T) {
@@ -36,4 +38,8 @@ func TestMax(t *testing.T) {
 			t.Logf("%d ok", i)
 		}
 	}
+}
+
+func TestMinDuration(t *testing.T) {
+	fmt.Println(MinDuration(time.Second, time.Minute))
 }

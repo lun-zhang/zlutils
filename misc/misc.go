@@ -1,6 +1,9 @@
 package misc
 
-import "reflect"
+import (
+	"reflect"
+	"time"
+)
 
 func AbsInt(i int) int {
 	if i >= 0 {
@@ -79,6 +82,9 @@ func MaxInt16(a int16, b ...int16) int16 { return max(a, b).(int16) }
 
 func MinInt64(a int64, b ...int64) int64 { return min(a, b).(int64) }
 func MaxInt64(a int64, b ...int64) int64 { return max(a, b).(int64) }
+
+func MinDuration(a time.Duration, b ...time.Duration) time.Duration { return min(a, b).(time.Duration) }
+func MaxDuration(a time.Duration, b ...time.Duration) time.Duration { return max(a, b).(time.Duration) }
 
 func MinUint(a uint, b ...uint) uint { return min(a, b).(uint) }
 func MaxUint(a uint, b ...uint) uint { return max(a, b).(uint) }
