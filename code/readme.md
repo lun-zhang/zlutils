@@ -51,7 +51,7 @@ func (code Code) Error() string {
 }
 ```
 ## 响应错误码
-虽然现在不需要调用code.Send了(因为[用bind.Wrap后你就不用再写接口层了！](bind/))，但还是说下：  
+虽然现在不需要调用code.Send了(因为[用bind.Wrap后你就不用再写接口层了！](/bind/))，但还是说下：  
 现在只需要调用code.Send(c,data,err)，就能识别err是服务器错误还是客户端错误，
 另外有错误的时候，不需要也不应该把data数据返回  
 ### 没有错误码时是这样处理的
@@ -104,8 +104,8 @@ if 活动已结束 {
 ### 输出trace_id方便定位
 如果接口发生少量错误，还能通过过滤error关键字找到日志，但是  
 如果测试同学说调了一次接口，返回是200，ret=0，但是数据逻辑不正确，如何定位到这次请求？  
-那么返回输出trace_id吧([logger包](logger/)已支持trace_id，
-[gorm](https://github.com/lun-zhang/gorm/tree/v1.13.3)打印日志时也写入了trace_id，如何使用参考[mysql包](mysql/))： 
+那么返回输出trace_id吧([logger包](/logger/)已支持trace_id，
+[gorm](https://github.com/lun-zhang/gorm/tree/v1.9.14-beta.1.14.0)打印日志时也写入了trace_id，如何使用参考[mysql包](/mysql/))： 
 ```json
 {
     "ret": 0,

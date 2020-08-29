@@ -1,7 +1,7 @@
 # 调用其他接口时候，应当像调用自己的函数一样简单
 既然要像函数一样，也就是有入参和出参，不管是GET POST，它们入参也就是Body Query Header Uri（这里未实现Uri参数），
 出参是响应的Body  
-例如现在我要调用[bind包下readme中定义的info接口](bind/)，
+例如现在我要调用[bind包下readme中定义的info接口](/bind/)，
 这个接口太乱了，虽说是POST方法，但是Query Header里为啥要有参数！用ctxhttp.Post没法调，
 只能用ctxhttp.Do，并且设置http.Request才行，那么用requst包就很简单了：  
 首先确定这个接口的方法、url、超时时间：
