@@ -1,4 +1,4 @@
-module zlutils
+module github.com/lun-zhang/zlutils/v7
 
 go 1.12
 
