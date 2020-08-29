@@ -1,4 +1,4 @@
-module zlutils/v7
+module zlutils
 
 go 1.12
 
