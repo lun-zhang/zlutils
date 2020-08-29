@@ -66,34 +66,9 @@
 go.mod中用replace
 ```
 require zlutils v0.0.0
-replace zlutils v0.0.0 => xlbj-gitlab.xunlei.cn/oversea/zlutils/v7 v7 //go build时会找到v7最新版本
+replace zlutils v0.0.0 => github.com/lun-zhang/zlutils/v7 v7 //go build时会找到v7最新版本
 ```
 代码中这样导入：`import "zlutils/time"`，这样做的好处是：
 1. ***避免同时引入本项目的不同版本***，导致类型/变量值不匹配
 
 坏处是：
-
-## 工具包在公司私有gitlab上，go mod拉取报错
-该项目在公司私有gitlab，因此安全起见都是用ssh拉的代码，但是go.mod中用的url是https的`xlbj-gitlab.xunlei.cn/oversea/zlutils`，会报错：
-```
-go: errors parsing go.mod:
-/data/project/proxy_spider/go.mod:17: invalid module version xlbj-gitlab.xunlei.cn/oversea/zlutils/v7: git ls-remote -q https://xlbj-gitlab.xunlei.cn/oversea/zlutils.git in /data/project/go/pkg/mod/cache/vcs/6156227698db14dbc4a3f0737ba273596653cb201e8541df7305578248fa4fcd: exit status 128:
-        fatal: could not read Username for 'https://xlbj-gitlab.xunlei.cn': terminal prompts disabled
-```
-因此需要设置一下本地git配置，让git在拉取公司代码时，将`https://xlbj-gitlab.xunlei.cn`替换成`git@xlbj-gitlab.xunlei.cn`:
-```
-~$ cat .gitconfig
-[url "git@xlbj-gitlab.xunlei.cn:"]
-    insteadOf = https://xlbj-gitlab.xunlei.cn/
-```
-
-## 1.13以上报错：reading sum.golang.org 410 Gone
-```
-go: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0/go.mod: verifying module: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0/go.mod: reading https://sum.golang.org/lookup/xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0: 410 Gone
-        server response: not found: xlbj-gitlab.xunlei.cn/oversea/zlutils/v7@v7.15.0: unrecognized import path "xlbj-gitlab.xunlei.cn/oversea/zlutils/v7": https fetch: Get "https://xlbj-gitlab.xunlei.cn/oversea/zlutils/v7?go-get=1": dial tcp 47.103.68.13:443: connect: connection refused
-```
-1.13之后设置了默认的GOSUMDB=sum.golang.org  
-所以要执行以下命令关闭：
-```
-go env -w GOSUMDB=off
-```

@@ -1,4 +1,4 @@
-module gitlab.xunlei.cn/xl-overseas-server/zlutils/v7
+module zlutils/v7
 
 go 1.12
 
@@ -10,7 +10,6 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gosexy/to v0.0.0-20141221203644-c20e083e3123
 	github.com/hashicorp/consul/api v1.1.0
-	github.com/hashicorp/go-uuid v1.0.1
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/lun-zhang/gorm v1.9.14-beta.1.14.0
 	github.com/prometheus/client_golang v1.7.0
