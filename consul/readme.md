@@ -73,5 +73,35 @@ consul.WithPrefix("test/service/zl_com").
 ```
 要注意的是公共配置慎用watch
 
+## watch安全
+### 如果配置出错, 则不会生效
+旧版本使用`WatchJsonVarious("i", &i)`时, 如果配置出错(unmarshal失败或validator失败), 则`i`会被`mysql.SetZero`置为`零值`,   
+这一版本已修复, 会先在临时变量进行修改, 成功后才会进行设置
+>如果是用的`func`,旧版也没问题, 配置出错时不会调用`func` 
+>```go
+>WatchJsonVarious("i", func(i *int) {
+>  fmt.Println(*i) 
+>})
+>```
+### `WithLocker`并发控制
+```go
+var m map[int]int
+WatchJsonVarious("m", &m)
+```
+如果修改配置的同时, 其他协程也修改`m`, 则会`panic`, 因为`map`不允许并发修改, 因此需要用锁制造临界区:
+```go
+mu := &sync.Mutex{} //自行生成一个locker
+WithLocker(mu).WatchJsonVarious("m", &m) //watch协程会先Lock()然后才会修改`m`
+
+go func() {
+  for {
+    mu.Lock()//自己访问`m`时也需Lock()
+    m[1] = 1
+    mu.Unlock()
+  }
+}()
+```
+`watch`的临界区非常小, 只是`unmarshal`和`validate`, 因此无需担心占用锁太久
+
 ## 建议
 变量的声明尽量推迟到第一次用到它的地方、减少变量的暴露（这样做的缺点是不运行是不知道缺少哪些配置的）

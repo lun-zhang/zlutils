@@ -9,7 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"reflect"
-	"zlutils/mysql"
+	"sync"
+	"zlutils/misc"
 )
 
 var (
@@ -26,6 +27,16 @@ func WithPrefix(prefix string) Consul {
 
 func (m Consul) WithPrefix(prefix string) Consul {
 	m.prefixPtr = &prefix
+	return m
+}
+
+func WithLocker(locker sync.Locker) Consul {
+	var m Consul
+	return m.WithLocker(locker)
+}
+
+func (m Consul) WithLocker(locker sync.Locker) Consul {
+	m.locker = locker
 	return m
 }
 
@@ -111,6 +122,7 @@ type Consul struct {
 	valiTypePtr *int
 	tag         string
 	prefixPtr   *string
+	locker      sync.Locker
 }
 
 var defaultConsul Consul //默认的
@@ -120,27 +132,23 @@ const (
 	valiVar    = 2
 )
 
-func newInt(i int) *int {
-	return &i
-}
-
 func (m Consul) ValiStruct() Consul {
-	m.valiTypePtr = newInt(valiStruct)
+	m.valiTypePtr = misc.NewInt(valiStruct)
 	return m
 }
 
 func (m Consul) ValiVar(tag string) Consul {
-	m.valiTypePtr = newInt(valiVar)
+	m.valiTypePtr = misc.NewInt(valiVar)
 	m.tag = tag
 	return m
 }
 
 func ValiStruct() Consul {
-	return Consul{valiTypePtr: newInt(valiStruct)}
+	return Consul{valiTypePtr: misc.NewInt(valiStruct)}
 }
 func ValiVar(tag string) Consul {
 	return Consul{
-		valiTypePtr: newInt(valiVar),
+		valiTypePtr: misc.NewInt(valiVar),
 		tag:         tag,
 	}
 }
@@ -203,6 +211,10 @@ func watchJson(key string, ptr interface{}, handler func(), lo Consul, unmarshal
 		handler()
 	}
 	plan.Handler = func(idx uint64, raw interface{}) {
+		if lo.locker != nil {
+			lo.locker.Lock() //避免竞争, 例如map并发修改会panic
+			defer lo.locker.Unlock()
+		}
 		entry := logrus.WithField("key", key)
 		var value []byte
 		defer func() {
@@ -213,17 +225,23 @@ func watchJson(key string, ptr interface{}, handler func(), lo Consul, unmarshal
 		}()
 		if kv, ok := raw.(*api.KVPair); ok && kv != nil {
 			value = kv.Value
-			entry = entry.WithField("bs", string(value))
-			mysql.SetZero(ptr) //没有出现的字段不会被json.Unmarshal设置，因此这里先置零
-			if err := unmarshal(value, ptr); err != nil {
+			entry = entry.WithFields(logrus.Fields{
+				"bs":        string(value),
+				"value_old": reflect.ValueOf(ptr).Elem().Interface(), //获取指向的值, 不然指针变了会打印新值
+			})
+
+			rt := reflect.TypeOf(ptr)
+			tmp := reflect.New(rt.Elem()).Interface() //先在临时变量上修改, 没问题再设置, 如同nginx -s reload
+			if err := unmarshal(value, &tmp); err != nil {
 				entry.WithError(err).Errorf("consul watch unmarshal json failed")
 				return
 			}
-			entry = entry.WithField("value", ptr)
-			if err := valiVa(lo, ptr); err != nil {
+			entry = entry.WithField("value_new", tmp)
+			if err := valiVa(lo, tmp); err != nil {
 				entry.WithError(err).Error("vali failed")
 				return
 			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(tmp).Elem())
 			entry.Info("consul watch value ok")
 			if handler != nil {
 				handler() //启动时会起个线程执行一次，发生修改后回调

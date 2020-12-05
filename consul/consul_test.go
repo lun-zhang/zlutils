@@ -2,6 +2,7 @@ package consul
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 	"zlutils/logger"
@@ -14,9 +15,9 @@ type Tmp struct {
 }
 
 func TestWatchJson(t *testing.T) {
-	Init(":8500", "test/service/counter")
+	Init(":8500", "tmp")
 	var tmp Tmp
-	ValiStruct().WatchJson("tmp", &tmp, func() {
+	ValiStruct().WatchJson("d", &tmp, func() {
 		//panic(1)
 		fmt.Println("change to", tmp)
 	})
@@ -78,4 +79,42 @@ func TestWithPrefix(t *testing.T) {
 	}) {
 		fmt.Println(redis)
 	})
+}
+
+func TestWatchJsonVariousVar(t *testing.T) {
+	Init(":8500", "tmp")
+	var i *int
+	WatchJsonVarious("i", &i)
+	for {
+		fmt.Println(*i)
+		time.Sleep(time.Second)
+	}
+}
+func TestWatchJsonVariousFunc(t *testing.T) {
+	Init(":8500", "tmp")
+	WatchJsonVarious("i", func(i *int) {
+		fmt.Println(*i)
+	})
+	select {}
+}
+
+func TestWatchWithLocker(t *testing.T) {
+	Init(":8500", "tmp")
+	mu := &sync.Mutex{}
+	var i int
+	WithLocker(mu).WatchJsonVarious("i", &i)
+	go func() {
+		for {
+			mu.Lock()
+			fmt.Println("访问i的这几秒中, consul的修改不会生效")
+			time.Sleep(time.Second * 5)
+			mu.Unlock()
+			fmt.Println("观察i此时才发生变化")
+			time.Sleep(time.Second * 5)
+		}
+	}()
+	for {
+		fmt.Println(i)
+		time.Sleep(time.Second)
+	}
 }
