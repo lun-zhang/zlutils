@@ -12,12 +12,12 @@ import (
 	"zlutils/guard"
 )
 
-//NOTE: 只能用于初始化时候，失败则fatal
+//NOTE: 只能用于初始化时候，失败则panic
 //redis基本不会是性能瓶颈，所以不放xray
 func New(url string) (client *Client) {
 	redisOpt, err := redis.ParseURL(url)
 	if err != nil {
-		logrus.WithError(err).Fatalf("redis connect failed")
+		logrus.WithError(err).Panic("redis connect failed")
 	}
 	client = &Client{redis.NewClient(redisOpt)}
 	//NOTE: pipeline没法用这个打日志
@@ -157,7 +157,7 @@ func checkOut(outPtrType, bizKeyType reflect.Type) error {
 2. `keyFunc`必须只有一个入参和一个出参，
  * 入参类型必须与`bizKeys`的数组内每个元素的类型相同
  * 出参类型必须是`string`
-3. `fillFunc`必须是2个入参，2个出参
+3. `fillFunc`(不为nil时)必须是2个入参，2个出参
  * 入参顺序：
   1. `ctx context.Context`
   2. `noCachedBizKeys` 未命中的`bizKey`数组，类型必须与`bizKeys`相同
@@ -202,10 +202,15 @@ func (client *Client) BizMGetJsonMapWithFill(ctx context.Context, bizKeys, keyFu
 	bizValueType := outType.Elem()
 
 	//检查fillFunc
-	fillFuncType := reflect.TypeOf(fillFunc)
-	if err = checkFillFunc(fillFuncType, bizKeysType, outType); err != nil {
-		entry.WithError(err).Error()
-		return
+	if fillFunc != nil {
+		fillFuncType := reflect.TypeOf(fillFunc)
+		if err = checkFillFunc(fillFuncType, bizKeysType, outType); err != nil {
+			entry.WithError(err).Error()
+			return
+		}
+	}
+	if bizKeysValue.Len() == 0 {
+		return //key为空数组就不执行
 	}
 
 	var redisKeys []string
@@ -239,8 +244,7 @@ func (client *Client) BizMGetJsonMapWithFill(ctx context.Context, bizKeys, keyFu
 		}
 	}
 
-	var noCachedMapValue reflect.Value
-	if noCachedBizKeysValue.Len() > 0 {
+	if noCachedBizKeysValue.Len() > 0 && fillFunc != nil {
 		fillFuncValue := reflect.ValueOf(fillFunc)
 		in := []reflect.Value{reflect.ValueOf(ctx), noCachedBizKeysValue}
 		out := fillFuncValue.Call(in)
@@ -248,7 +252,7 @@ func (client *Client) BizMGetJsonMapWithFill(ctx context.Context, bizKeys, keyFu
 			err = out[1].Interface().(error)
 			return
 		}
-		noCachedMapValue = out[0]
+		noCachedMapValue := out[0]
 		if noCachedMapValue.Len() > 0 {
 			pipe := client.Pipeline()
 			defer pipe.Close()
