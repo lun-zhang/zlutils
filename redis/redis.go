@@ -82,7 +82,204 @@ func (client *Client) GetJson(ctx context.Context, key string, value interface{}
 	return
 }
 
-//存成map，方便不存储nil
+func checkKeyFunc(funcType, bizKeyType reflect.Type) error {
+	if kind := funcType.Kind(); kind != reflect.Func {
+		return fmt.Errorf("keyFunc kind %s must be func", kind)
+	}
+	//检查入参
+	if n := funcType.NumIn(); n != 1 {
+		return fmt.Errorf("keyFunc num in %d must be 1", n)
+	}
+	in0Type := funcType.In(0)
+	if in0Type != bizKeyType {
+		return fmt.Errorf("keyFuncIn0Type %s must eq bizKeyType %s", in0Type, bizKeyType)
+	}
+	//检查出参
+	if n := funcType.NumOut(); n != 1 {
+		return fmt.Errorf("keyFunc num out %d must be 1", n)
+	}
+	if kind := funcType.Out(0).Kind(); kind != reflect.String {
+		return fmt.Errorf("keyFuncOut0Kind %s must be string", kind)
+	}
+	return nil
+}
+
+func checkFillFunc(funcType, bizKeysType, outType reflect.Type) error {
+	if kind := funcType.Kind(); kind != reflect.Func {
+		return fmt.Errorf("fillFunc kind %s must be func", kind)
+	}
+	//检查入参
+	if n := funcType.NumIn(); n != 2 {
+		return fmt.Errorf("fillFunc num in %d must be 2", n)
+	}
+
+	in0Type := funcType.In(0)
+	if _, ok := reflect.New(in0Type).Interface().(*context.Context); !ok {
+		return fmt.Errorf("fillFuncIn0Type %s must eq context.Context", in0Type)
+	}
+
+	in1Type := funcType.In(1)
+	if in1Type != bizKeysType {
+		return fmt.Errorf("fillFuncIn1Type %s must eq bizKeysType %s", in1Type, bizKeysType)
+	}
+	//检查出参
+	if n := funcType.NumOut(); n != 2 {
+		return fmt.Errorf("fillFunc num out %d must be 2", n)
+	}
+
+	if out0Type := funcType.Out(0); out0Type != outType {
+		return fmt.Errorf("fillFuncOut0Type %s must eq outType %s", out0Type, outType)
+	}
+	out1Type := funcType.Out(1)
+	if _, ok := reflect.New(out1Type).Interface().(*error); !ok {
+		return fmt.Errorf("fillFuncOut1Kind %s must eq context.Context", out1Type)
+	}
+	return nil
+}
+
+func checkOut(outPtrType, bizKeyType reflect.Type) error {
+	if kind := outPtrType.Kind(); kind != reflect.Ptr {
+		return fmt.Errorf("outPtr kind %s must be ptr", kind)
+	}
+	outType := outPtrType.Elem()
+	if kind := outType.Kind(); kind != reflect.Map {
+		return fmt.Errorf("out kind %s must be map", kind)
+	}
+	if keyType := outType.Key(); keyType != bizKeyType {
+		return fmt.Errorf("out key type %s must eq bizKeyType %s", keyType, bizKeyType)
+	}
+	return nil
+}
+
+/*
+入参解释：
+1. `bizKeys`必须是`slice`
+2. `keyFunc`必须只有一个入参和一个出参，
+ * 入参类型必须与`bizKeys`的数组内每个元素的类型相同
+ * 出参类型必须是`string`
+3. `fillFunc`必须是2个入参，2个出参
+ * 入参顺序：
+  1. `ctx context.Context`
+  2. `noCachedBizKeys` 未命中的`bizKey`数组，类型必须与`bizKeys`相同
+ * 出参顺序：
+  1. `noCachedMap map[bizKey类型]bizValue类型`
+  2. `err error` 发生错误时，会返回
+4. `outPtr` 必须是`map[bizKey类型]bizValue类型`的地址
+*/
+func (client *Client) BizMGetJsonMapWithFill(ctx context.Context, bizKeys, keyFunc, fillFunc, outPtr interface{}, expiration time.Duration) (err error) {
+	defer guard.BeforeCtx(&ctx)(&err)
+	entry := logrus.WithContext(ctx).
+		WithFields(logrus.Fields{
+			"bizKeys":    bizKeys,
+			"expiration": expiration,
+		})
+
+	//检查bizKeys类型
+	bizKeysValue := reflect.ValueOf(bizKeys)
+	if kind := bizKeysValue.Kind(); kind != reflect.Slice {
+		err = fmt.Errorf("bizKeys kind %s must be slice", kind)
+		entry.WithError(err).Error()
+		return
+	}
+	bizKeysType := bizKeysValue.Type()
+	bizKeyType := bizKeysType.Elem()
+
+	//检查keyFunc
+	keyFuncValue := reflect.ValueOf(keyFunc)
+	keyFuncType := reflect.TypeOf(keyFunc)
+	if err = checkKeyFunc(keyFuncType, bizKeyType); err != nil {
+		entry.WithError(err).Error()
+		return
+	}
+
+	//检查outPtr
+	outPtrType := reflect.TypeOf(outPtr)
+	if err = checkOut(outPtrType, bizKeyType); err != nil {
+		entry.WithError(err).Error()
+		return
+	}
+	outType := outPtrType.Elem()
+	bizValueType := outType.Elem()
+
+	//检查fillFunc
+	fillFuncType := reflect.TypeOf(fillFunc)
+	if err = checkFillFunc(fillFuncType, bizKeysType, outType); err != nil {
+		entry.WithError(err).Error()
+		return
+	}
+
+	var redisKeys []string
+	for i := 0; i < bizKeysValue.Len(); i++ {
+		out := keyFuncValue.Call([]reflect.Value{bizKeysValue.Index(i)})
+		redisKeys = append(redisKeys, out[0].String())
+	}
+	entry = entry.WithField("redisKeys", redisKeys)
+
+	cmds := client.MGet(redisKeys...)
+	entry = entry.WithField("mget-cmds", cmds.String())
+	if err = cmds.Err(); err != nil {
+		entry.WithError(err).Error()
+		return
+	}
+
+	noCachedBizKeysValue := reflect.MakeSlice(bizKeysType, 0, 0)
+
+	cachedMapValue := reflect.ValueOf(outPtr).Elem()
+	cachedMapValue.Set(reflect.MakeMap(cachedMapValue.Type()))
+	for i, val := range cmds.Val() {
+		if val == nil {
+			noCachedBizKeysValue = reflect.Append(noCachedBizKeysValue, bizKeysValue.Index(i))
+		} else {
+			newValuePtr := reflect.New(bizValueType).Interface()
+			if err = json.Unmarshal([]byte(val.(string)), newValuePtr); err != nil {
+				entry.WithError(err).Error()
+				return
+			}
+			cachedMapValue.SetMapIndex(bizKeysValue.Index(i), reflect.ValueOf(newValuePtr).Elem())
+		}
+	}
+
+	var noCachedMapValue reflect.Value
+	if noCachedBizKeysValue.Len() > 0 {
+		fillFuncValue := reflect.ValueOf(fillFunc)
+		in := []reflect.Value{reflect.ValueOf(ctx), noCachedBizKeysValue}
+		out := fillFuncValue.Call(in)
+		if !out[1].IsNil() {
+			err = out[1].Interface().(error)
+			return
+		}
+		noCachedMapValue = out[0]
+		if noCachedMapValue.Len() > 0 {
+			pipe := client.Pipeline()
+			defer pipe.Close()
+
+			for iter := noCachedMapValue.MapRange(); iter.Next(); {
+				cachedMapValue.SetMapIndex(iter.Key(), iter.Value())
+				bs, err := json.Marshal(iter.Value().Interface())
+				if err != nil {
+					entry.WithError(err).Error()
+					return err
+				}
+				redisKey := keyFuncValue.Call([]reflect.Value{iter.Key()})[0].String()
+				pipe.Set(redisKey, string(bs), expiration)
+			}
+			cmds, err := pipe.Exec()
+
+			var cmdss []string
+			for _, cmd := range cmds {
+				cmdss = append(cmdss, cmd.String())
+				entry = entry.WithField("pipe-set-cmds", cmdss)
+			}
+			entry.Debug()
+			if err != nil {
+				entry.WithError(err).Error()
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (client *Client) MGetJsonMap(ctx context.Context, keys []string, mapPtr interface{}) (err error) {
 	defer guard.BeforeCtx(&ctx)(&err)
 	rv := reflect.ValueOf(mapPtr)

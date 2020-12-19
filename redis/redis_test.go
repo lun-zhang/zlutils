@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 	"zlutils/logger"
+	"zlutils/misc"
 )
 
 var ctx = context.Background()
@@ -55,4 +56,27 @@ func TestClient_MGetJsonMap(t *testing.T) {
 		t.Fatal(err)
 	}
 	fmt.Println(mp)
+}
+
+func TestClient_BizMGetJsonMap(t *testing.T) {
+	logger.Init(logger.Config{Level: logrus.DebugLevel})
+	client := New("redis://localhost:6379")
+	var out map[int]*float64
+	err := client.BizMGetJsonMapWithFill(ctx, []int{1, 2, 3}, func(id int) string {
+		return fmt.Sprintf("mm:%d", id)
+	}, func(ctx context.Context, ids []int) (m map[int]*float64, err error) {
+		m = map[int]*float64{}
+		for _, id := range ids {
+			if id%2 == 0 {
+				m[id] = nil //让redis保存null，避免击穿
+			} else {
+				m[id] = misc.NewFloat64(float64(id * 10))
+			}
+		}
+		return m, nil
+	}, &out, time.Hour)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(out)
 }
